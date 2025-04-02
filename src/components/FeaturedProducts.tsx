@@ -1,12 +1,16 @@
 
-import { getFeaturedProducts } from "@/data/products";
+import { useQuery } from "@tanstack/react-query";
 import ProductCard from "./ProductCard";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { getFeaturedProducts } from "@/services/productService";
 
 export default function FeaturedProducts() {
-  const featuredProducts = getFeaturedProducts();
+  const { data: featuredProducts, isLoading, error } = useQuery({
+    queryKey: ['featuredProducts'],
+    queryFn: getFeaturedProducts,
+  });
 
   return (
     <section className="py-12">
@@ -20,11 +24,21 @@ export default function FeaturedProducts() {
           </Link>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {featuredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Unable to load featured products.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {featuredProducts?.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
