@@ -74,6 +74,9 @@ const Auth = () => {
           description: error.message
         });
       } else {
+        // Store the email for verification resending
+        localStorage.setItem("pendingVerificationEmail", signupEmail);
+        
         toast.success("Signup successful", {
           description: "Please check your email to verify your account."
         });
