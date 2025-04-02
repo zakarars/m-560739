@@ -1,75 +1,88 @@
 
-import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Order } from "@/types";
-import { Package, Loader2, ShoppingBag } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  ShoppingBag,
+  Clock,
+  Check,
+  Truck,
+  PackageCheck,
+  ArrowRight,
+} from "lucide-react";
+import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { Order, OrderStatus } from "@/types/orders";
+
+const statusIcons = {
+  pending: <Clock className="h-4 w-4 text-yellow-500" />,
+  processing: <Check className="h-4 w-4 text-blue-500" />,
+  shipped: <Truck className="h-4 w-4 text-purple-500" />,
+  delivered: <PackageCheck className="h-4 w-4 text-green-500" />,
+};
+
+const statusLabels = {
+  pending: "Pending",
+  processing: "Processing",
+  shipped: "Shipped",
+  delivered: "Delivered",
+};
 
 const Orders = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Redirect to login if not authenticated
   useEffect(() => {
-    if (!user) {
-      navigate("/auth");
-    }
-  }, [user, navigate]);
+    async function fetchOrders() {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
 
-  // Fetch orders from Supabase
-  const { data: orders, isLoading, error } = useQuery({
-    queryKey: ["orders", user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      
-      const { data: ordersData, error: ordersError } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      
-      if (ordersError) throw ordersError;
-      
-      // For each order, fetch the order items and products
-      const ordersWithItems = await Promise.all(
-        ordersData.map(async (order) => {
-          const { data: orderItems, error: itemsError } = await supabase
-            .from("order_items")
-            .select("*, products(*)")
-            .eq("order_id", order.id);
-          
-          if (itemsError) throw itemsError;
-          
-          // Transform to match CartItem type structure
-          const items = orderItems.map(item => ({
-            productId: item.product_id,
-            quantity: item.quantity,
-            product: {
-              id: item.products.id,
-              name: item.products.name,
-              description: item.products.description,
-              price: item.products.price,
-              imageUrl: item.products.imageurl,
-              category: item.products.category,
-              featured: item.products.featured
-            }
-          }));
-          
-          return {
-            ...order,
-            items
-          };
-        })
-      );
-      
-      return ordersWithItems;
-    },
-    enabled: !!user
-  });
+      try {
+        const { data, error: fetchError } = await supabase
+          .from("orders")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (fetchError) throw fetchError;
+
+        setOrders(data || []);
+      } catch (err) {
+        console.error("Error fetching orders:", err);
+        setError('Failed to load orders');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchOrders();
+  }, [user]);
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-16 text-center">
+          <Clock className="w-12 h-12 mx-auto mb-4 animate-spin text-primary" />
+          <h1 className="text-2xl font-bold">Loading orders...</h1>
+        </div>
+      </Layout>
+    );
+  }
 
   if (!user) {
     return (
@@ -80,19 +93,9 @@ const Orders = () => {
           <p className="text-muted-foreground mb-6">
             Please sign in to view your orders
           </p>
-          <Button onClick={() => navigate("/auth")}>
-            Sign In / Create Account
+          <Button asChild>
+            <Link to="/auth">Sign In</Link>
           </Button>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <Layout>
-        <div className="container mx-auto px-4 py-16 flex justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </Layout>
     );
@@ -102,117 +105,92 @@ const Orders = () => {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-16 text-center">
-          <h1 className="text-3xl font-bold mb-4">Something went wrong</h1>
-          <p className="text-muted-foreground mb-8">We couldn't load your orders at this time.</p>
-          <Button onClick={() => window.location.reload()}>
-            Try Again
+          <h1 className="text-2xl font-bold text-destructive mb-4">{error}</h1>
+          <Button asChild>
+            <Link to="/shop">Continue Shopping</Link>
           </Button>
         </div>
       </Layout>
     );
   }
 
-  if (!orders || orders.length === 0) {
-    return (
-      <Layout>
-        <div className="container mx-auto px-4 py-16 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-            <Package className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h1 className="text-3xl font-bold mb-4">No Orders Yet</h1>
-          <p className="text-muted-foreground mb-8">You haven't placed any orders yet.</p>
-          <Link to="/shop">
-            <Button>
-              Start Shopping
-            </Button>
-          </Link>
-        </div>
-      </Layout>
-    );
-  }
-
-  const getStatusBadgeClass = (status: Order['status']) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-amber-100 text-amber-800';
-      case 'processing':
-        return 'bg-blue-100 text-blue-800';
-      case 'shipped':
-        return 'bg-purple-100 text-purple-800';
-      case 'delivered':
-        return 'bg-green-100 text-green-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Your Orders</h1>
-        
-        <div className="space-y-6">
-          {orders.map((order) => {
-            const orderDate = new Date(order.created_at).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric'
-            });
+      <div className="container max-w-4xl mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-2">Your Orders</h1>
+        <p className="text-muted-foreground mb-8">
+          Track and manage your orders
+        </p>
+
+        {orders.length === 0 ? (
+          <div className="bg-background rounded-lg border p-10 text-center">
+            <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <h2 className="text-xl font-medium mb-2">No orders yet</h2>
+            <p className="text-muted-foreground mb-6">
+              You haven't placed any orders yet
+            </p>
+            <Button asChild>
+              <Link to="/shop">Start Shopping</Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="bg-background rounded-lg border overflow-hidden">
+            <div className="p-4 md:p-6">
+              <h2 className="text-xl font-semibold">Order History</h2>
+              <p className="text-sm text-muted-foreground">
+                {orders.length} {orders.length === 1 ? "order" : "orders"}
+              </p>
+            </div>
             
-            return (
-              <div key={order.id} className="border rounded-lg overflow-hidden">
-                <div className="bg-muted/50 p-4 flex flex-wrap justify-between items-center gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      {orderDate}
-                    </p>
-                    <p className="font-medium">Order #{order.id.substring(0, 8)}</p>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(order.status)}`}>
-                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                    </span>
-                    
-                    <Link to={`/order-confirmation/${order.id}`}>
-                      <Button variant="outline" size="sm">
-                        View Order
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-                
-                <div className="p-4">
-                  <div className="flex flex-col gap-4">
-                    {order.items.slice(0, 2).map((item) => (
-                      <div key={item.productId} className="flex items-center gap-4">
-                        <div className="w-16 h-16 rounded overflow-hidden">
-                          <img 
-                            src={item.product.imageUrl} 
-                            alt={item.product.name} 
-                            className="w-full h-full object-cover"
-                          />
+            <Separator />
+            
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order #</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {orders.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">
+                        {order.id.substring(0, 8)}
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(order.created_at), "MMM d, yyyy")}
+                      </TableCell>
+                      <TableCell>${order.total.toFixed(2)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {statusIcons[order.status as OrderStatus]}
+                          {statusLabels[order.status as OrderStatus]}
                         </div>
-                        <div>
-                          <p className="font-medium">{item.product.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Qty: {item.quantity} × ${item.product.price.toFixed(2)}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                    
-                    {order.items.length > 2 && (
-                      <p className="text-sm text-muted-foreground">
-                        + {order.items.length - 2} more item(s)
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          asChild
+                          variant="ghost"
+                          size="sm"
+                          className="flex items-center"
+                        >
+                          <Link to={`/order-confirmation/${order.id}`}>
+                            Details
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

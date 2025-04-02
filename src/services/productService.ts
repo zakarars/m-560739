@@ -13,7 +13,11 @@ export async function getProducts(): Promise<Product[]> {
     return []
   }
   
-  return data || []
+  // Map database field 'imageurl' to 'imageUrl' expected by the Product type
+  return data ? data.map(item => ({
+    ...item,
+    imageUrl: item.imageurl
+  })) as Product[] : []
 }
 
 export async function getProductsByCategory(category: string): Promise<Product[]> {
@@ -30,7 +34,11 @@ export async function getProductsByCategory(category: string): Promise<Product[]
     return []
   }
   
-  return data || []
+  // Map database field 'imageurl' to 'imageUrl' expected by the Product type
+  return data ? data.map(item => ({
+    ...item,
+    imageUrl: item.imageurl
+  })) as Product[] : []
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
@@ -45,7 +53,11 @@ export async function getProductById(id: string): Promise<Product | null> {
     return null
   }
   
-  return data
+  // Map database field 'imageurl' to 'imageUrl' expected by the Product type
+  return data ? {
+    ...data,
+    imageUrl: data.imageurl
+  } as Product : null
 }
 
 export async function getFeaturedProducts(): Promise<Product[]> {
@@ -60,5 +72,9 @@ export async function getFeaturedProducts(): Promise<Product[]> {
     return []
   }
   
-  return data || []
+  // Map database field 'imageurl' to 'imageUrl' expected by the Product type
+  return data ? data.map(item => ({
+    ...item,
+    imageUrl: item.imageurl
+  })) as Product[] : []
 }

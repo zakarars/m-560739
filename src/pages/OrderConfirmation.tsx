@@ -1,77 +1,76 @@
 
-import { useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useParams, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Check, ArrowRight, Loader2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Separator } from "@/components/ui/separator";
+import { CheckCircle, Home, Package, ShoppingCart, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context/AuthContext";
+import { Order, OrderItem } from "@/types/orders";
 
 const OrderConfirmation = () => {
-  const { orderId } = useParams<{ orderId: string }>();
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  
-  // Redirect to login if not authenticated
+  const { orderId } = useParams();
+  const [order, setOrder] = useState<Order | null>(null);
+  const [items, setItems] = useState<OrderItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
   useEffect(() => {
-    if (!user) {
-      navigate("/auth");
+    async function fetchOrderDetails() {
+      setIsLoading(true);
+      try {
+        // Get order details
+        const { data: orderData, error: orderError } = await supabase
+          .from("orders")
+          .select("*")
+          .eq("id", orderId)
+          .single();
+        
+        if (orderError) throw orderError;
+
+        // Get order items and join with products
+        const { data: itemsData, error: itemsError } = await supabase
+          .from("order_items")
+          .select(`
+            *,
+            products:product_id (
+              id, name, price, imageurl, description, category
+            )
+          `)
+          .eq("order_id", orderId);
+        
+        if (itemsError) throw itemsError;
+
+        // Transform product data to match our expected format
+        const transformedItems = itemsData.map(item => ({
+          ...item,
+          product: {
+            ...item.products,
+            imageUrl: item.products.imageurl // Fix imageUrl field
+          }
+        }));
+
+        setOrder(orderData as Order);
+        setItems(transformedItems);
+      } catch (err) {
+        console.error("Error fetching order:", err);
+        setError('Failed to load order details');
+      } finally {
+        setIsLoading(false);
+      }
     }
-  }, [user, navigate]);
-  
-  // Query to fetch order data
-  const { data: order, isLoading, error } = useQuery({
-    queryKey: ["order", orderId],
-    queryFn: async () => {
-      if (!user || !orderId) return null;
-      
-      // First, fetch the order
-      const { data: orderData, error: orderError } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("id", orderId)
-        .eq("user_id", user.id)
-        .single();
-      
-      if (orderError) throw orderError;
-      
-      // Then fetch the order items with product data
-      const { data: orderItems, error: itemsError } = await supabase
-        .from("order_items")
-        .select("*, products(*)")
-        .eq("order_id", orderId);
-      
-      if (itemsError) throw itemsError;
-      
-      // Transform to match CartItem type structure
-      const items = orderItems.map(item => ({
-        productId: item.product_id,
-        quantity: item.quantity,
-        product: {
-          id: item.products.id,
-          name: item.products.name,
-          description: item.products.description,
-          price: item.products.price,
-          imageUrl: item.products.imageurl,
-          category: item.products.category,
-          featured: item.products.featured
-        }
-      }));
-      
-      return {
-        ...orderData,
-        items
-      };
-    },
-    enabled: !!user && !!orderId
-  });
+
+    if (orderId) {
+      fetchOrderDetails();
+    }
+  }, [orderId]);
 
   if (isLoading) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-16 flex justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="container mx-auto px-4 py-16 text-center">
+          <Clock className="w-12 h-12 mx-auto mb-4 animate-spin text-primary" />
+          <h1 className="text-2xl font-bold">Loading order details...</h1>
         </div>
       </Layout>
     );
@@ -81,125 +80,111 @@ const OrderConfirmation = () => {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-16 text-center">
-          <h1 className="text-3xl font-bold mb-4">Order Not Found</h1>
-          <p className="text-muted-foreground mb-8">The order you're looking for does not exist.</p>
-          <Link to="/">
-            <Button>
-              Return to Homepage
-            </Button>
-          </Link>
+          <h1 className="text-2xl font-bold text-destructive mb-4">
+            {error || "Order not found"}
+          </h1>
+          <Button asChild>
+            <Link to="/shop">Continue Shopping</Link>
+          </Button>
         </div>
       </Layout>
     );
   }
 
-  const formattedDate = new Date(order.created_at).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-  
-  const shippingAddress = order.shipping_address;
-
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 text-primary mb-4">
-            <Check className="h-8 w-8" />
+      <div className="container max-w-4xl mx-auto px-4 py-10">
+        <div className="flex items-center justify-center mb-6">
+          <div className="bg-primary/10 rounded-full p-3">
+            <CheckCircle className="h-10 w-10 text-primary" strokeWidth={1.5} />
           </div>
-          <h1 className="text-3xl font-bold mb-2">Thank You for Your Order!</h1>
-          <p className="text-muted-foreground">
-            Your order has been received and is being processed.
-          </p>
         </div>
         
-        <div className="border rounded-lg overflow-hidden mb-8">
-          <div className="bg-muted/50 p-4 border-b">
-            <h2 className="font-semibold">Order Details</h2>
+        <h1 className="text-3xl font-bold text-center mb-2">Order Confirmed</h1>
+        <p className="text-center text-muted-foreground mb-10">
+          Thank you for your purchase! Your order has been received.
+        </p>
+        
+        <div className="bg-background rounded-lg border p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Order Details</h2>
+            <p className="text-sm text-muted-foreground">
+              Order #: {order.id.substring(0, 8)}
+            </p>
           </div>
           
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="font-medium text-sm text-muted-foreground mb-2">
-                  ORDER INFORMATION
-                </h3>
-                <p className="mb-1"><strong>Order Number:</strong> {order.id.substring(0, 8)}</p>
-                <p className="mb-1"><strong>Date:</strong> {formattedDate}</p>
-                <p className="mb-1">
-                  <strong>Status:</strong> 
-                  <span className="inline-block ml-1 px-2 py-1 bg-amber-100 text-amber-800 text-xs font-medium rounded-full">
-                    {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                  </span>
+          <Separator className="mb-4" />
+          
+          <div className="space-y-4">
+            {items.map((item) => (
+              <div key={item.id} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-16 w-16 rounded overflow-hidden">
+                    <img 
+                      src={item.product.imageUrl} 
+                      alt={item.product.name}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div>
+                    <p className="font-medium">{item.product.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Qty: {item.quantity} × ${item.price.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+                <p className="font-medium">
+                  ${(item.price * item.quantity).toFixed(2)}
                 </p>
-                <p><strong>Total:</strong> ${order.total.toFixed(2)}</p>
               </div>
-              
-              <div>
-                <h3 className="font-medium text-sm text-muted-foreground mb-2">
-                  SHIPPING INFORMATION
-                </h3>
-                <p className="mb-1">{shippingAddress.fullName}</p>
-                <p className="mb-1">{shippingAddress.address}</p>
-                <p className="mb-1">
-                  {shippingAddress.city}, {shippingAddress.state} {shippingAddress.zipCode}
-                </p>
-                <p>{shippingAddress.country}</p>
-              </div>
+            ))}
+          </div>
+          
+          <Separator className="my-4" />
+          
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Subtotal</span>
+              <span>${order.total.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>Shipping</span>
+              <span>Free</span>
+            </div>
+            <div className="flex justify-between font-semibold pt-2">
+              <span>Total</span>
+              <span>${order.total.toFixed(2)}</span>
             </div>
           </div>
         </div>
         
-        <div className="border rounded-lg overflow-hidden mb-8">
-          <div className="bg-muted/50 p-4 border-b">
-            <h2 className="font-semibold">Order Items</h2>
-          </div>
+        <div className="bg-background rounded-lg border p-6">
+          <h2 className="text-xl font-semibold mb-4">Shipping Information</h2>
           
-          <table className="w-full">
-            <thead className="border-b">
-              <tr>
-                <th className="py-3 px-4 text-left">Product</th>
-                <th className="py-3 px-4 text-center">Quantity</th>
-                <th className="py-3 px-4 text-right">Price</th>
-              </tr>
-            </thead>
-            <tbody>
-              {order.items.map((item) => (
-                <tr key={item.productId} className="border-b">
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded overflow-hidden">
-                        <img 
-                          src={item.product.imageUrl} 
-                          alt={item.product.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <span>{item.product.name}</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 text-center">{item.quantity}</td>
-                  <td className="py-4 px-4 text-right">
-                    ${(item.quantity * item.product.price).toFixed(2)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="space-y-3">
+            <p className="font-medium">{order.shipping_address.fullName}</p>
+            <p>{order.shipping_address.address}</p>
+            <p>
+              {order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.zipCode}
+            </p>
+            <p>{order.shipping_address.country}</p>
+          </div>
         </div>
         
-        <div className="flex justify-center gap-4 mt-12">
-          <Link to="/orders">
-            <Button variant="outline">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
+          <Button asChild variant="outline" size="lg" className="sm:w-auto">
+            <Link to="/orders">
+              <Package className="mr-2 h-4 w-4" />
               View All Orders
-            </Button>
-          </Link>
-          <Link to="/">
-            <Button>
-              Continue Shopping <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
+            </Link>
+          </Button>
+          
+          <Button asChild size="lg" className="sm:w-auto">
+            <Link to="/shop">
+              <ShoppingCart className="mr-2 h-4 w-4" />
+              Continue Shopping
+            </Link>
+          </Button>
         </div>
       </div>
     </Layout>
