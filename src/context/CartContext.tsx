@@ -11,6 +11,8 @@ interface CartContextType {
   clearCart: () => void;
   itemCount: number;
   total: number;
+  cart: CartItem[]; // Added for backward compatibility
+  getCartTotal: () => number; // Added method
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -61,6 +63,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     0
   );
 
+  // Add getCartTotal method
+  const getCartTotal = () => {
+    return total;
+  };
+
   return (
     <CartContext.Provider value={{ 
       items, 
@@ -69,7 +76,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       updateQuantity,
       clearCart,
       itemCount,
-      total
+      total,
+      cart: items, // Added for backward compatibility
+      getCartTotal, // Added method
     }}>
       {children}
     </CartContext.Provider>

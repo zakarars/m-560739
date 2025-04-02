@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -6,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { CheckCircle, Home, Package, ShoppingCart, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Order, OrderItem } from "@/types/orders";
+import { Order, OrderItem, fromDbOrder } from "@/types/orders";
 
 const OrderConfirmation = () => {
   const { orderId } = useParams();
@@ -27,6 +26,9 @@ const OrderConfirmation = () => {
           .single();
         
         if (orderError) throw orderError;
+
+        // Convert from DB format to our app format
+        const typedOrder = fromDbOrder(orderData);
 
         // Get order items and join with products
         const { data: itemsData, error: itemsError } = await supabase
@@ -50,7 +52,7 @@ const OrderConfirmation = () => {
           }
         }));
 
-        setOrder(orderData as Order);
+        setOrder(typedOrder);
         setItems(transformedItems);
       } catch (err) {
         console.error("Error fetching order:", err);

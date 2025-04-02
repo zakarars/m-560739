@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -23,7 +22,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
-import { Order, OrderStatus } from "@/types/orders";
+import { Order, OrderStatus, fromDbOrder } from "@/types/orders";
 
 const statusIcons = {
   pending: <Clock className="h-4 w-4 text-yellow-500" />,
@@ -58,10 +57,12 @@ const Orders = () => {
           .select("*")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
-
+        
         if (fetchError) throw fetchError;
 
-        setOrders(data || []);
+        const typedOrders = data ? data.map(order => fromDbOrder(order)) : [];
+        
+        setOrders(typedOrders);
       } catch (err) {
         console.error("Error fetching orders:", err);
         setError('Failed to load orders');
