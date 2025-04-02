@@ -1,10 +1,20 @@
 
 import { Link } from "react-router-dom";
 import { useCart } from "@/context/CartContext";
-import { ShoppingCart, Menu, Leaf } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { ShoppingCart, Menu, Leaf, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 import { useState } from "react";
+import { toast } from "@/components/ui/sonner";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,14 +22,19 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { itemCount } = useCart();
+  const { user, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
     { name: "Home", path: "/" },
     { name: "Shop", path: "/shop" },
-    { name: "Our Story", path: "/our-story" },
-    { name: "Orders", path: "/orders" }
+    { name: "Our Story", path: "/our-story" }
   ];
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success("You have been signed out");
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -42,10 +57,42 @@ export default function Layout({ children }: LayoutProps) {
                   {link.name}
                 </Link>
               ))}
+              {user && (
+                <Link 
+                  to="/orders"
+                  className="text-sm font-medium hover:text-primary transition-colors border-b-2 border-transparent hover:border-primary pb-1"
+                >
+                  Orders
+                </Link>
+              )}
             </nav>
           </div>
 
           <div className="flex items-center gap-4">
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full">
+                    <User className="h-5 w-5" strokeWidth={1.5} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/orders" className="cursor-pointer">Orders</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sign out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Link to="/auth">
+                <Button variant="outline" size="sm">Sign In</Button>
+              </Link>
+            )}
             <Link to="/cart" className="relative">
               <ShoppingCart className="h-6 w-6" strokeWidth={1.5} />
               {itemCount > 0 && (
@@ -78,6 +125,35 @@ export default function Layout({ children }: LayoutProps) {
                       {link.name}
                     </Link>
                   ))}
+                  {user ? (
+                    <>
+                      <Link
+                        to="/orders"
+                        className="text-base hover:text-primary transition-colors py-2 border-b border-border"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Orders
+                      </Link>
+                      <button
+                        onClick={() => {
+                          handleSignOut();
+                          setMobileMenuOpen(false);
+                        }}
+                        className="text-base hover:text-primary transition-colors py-2 border-b border-border text-left flex items-center"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign out
+                      </button>
+                    </>
+                  ) : (
+                    <Link
+                      to="/auth"
+                      className="text-base hover:text-primary transition-colors py-2 border-b border-border"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Sign in
+                    </Link>
+                  )}
                 </div>
               </SheetContent>
             </Sheet>

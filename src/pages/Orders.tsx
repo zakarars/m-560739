@@ -1,20 +1,118 @@
 
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Order } from "@/types";
-import { Package } from "lucide-react";
+import { Package, Loader2, ShoppingBag } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const Orders = () => {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
+  // Redirect to login if not authenticated
   useEffect(() => {
-    const storedOrders = JSON.parse(localStorage.getItem("orders") || "[]") as Order[];
-    setOrders(storedOrders);
-  }, []);
+    if (!user) {
+      navigate("/auth");
+    }
+  }, [user, navigate]);
 
-  if (orders.length === 0) {
+  // Fetch orders from Supabase
+  const { data: orders, isLoading, error } = useQuery({
+    queryKey: ["orders", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const { data: ordersData, error: ordersError } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      
+      if (ordersError) throw ordersError;
+      
+      // For each order, fetch the order items and products
+      const ordersWithItems = await Promise.all(
+        ordersData.map(async (order) => {
+          const { data: orderItems, error: itemsError } = await supabase
+            .from("order_items")
+            .select("*, products(*)")
+            .eq("order_id", order.id);
+          
+          if (itemsError) throw itemsError;
+          
+          // Transform to match CartItem type structure
+          const items = orderItems.map(item => ({
+            productId: item.product_id,
+            quantity: item.quantity,
+            product: {
+              id: item.products.id,
+              name: item.products.name,
+              description: item.products.description,
+              price: item.products.price,
+              imageUrl: item.products.imageurl,
+              category: item.products.category,
+              featured: item.products.featured
+            }
+          }));
+          
+          return {
+            ...order,
+            items
+          };
+        })
+      );
+      
+      return ordersWithItems;
+    },
+    enabled: !!user
+  });
+
+  if (!user) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-16 text-center">
+          <ShoppingBag className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+          <h1 className="text-3xl font-bold mb-2">Sign In Required</h1>
+          <p className="text-muted-foreground mb-6">
+            Please sign in to view your orders
+          </p>
+          <Button onClick={() => navigate("/auth")}>
+            Sign In / Create Account
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-16 flex justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-16 text-center">
+          <h1 className="text-3xl font-bold mb-4">Something went wrong</h1>
+          <p className="text-muted-foreground mb-8">We couldn't load your orders at this time.</p>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!orders || orders.length === 0) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-16 text-center">
@@ -55,7 +153,7 @@ const Orders = () => {
         
         <div className="space-y-6">
           {orders.map((order) => {
-            const orderDate = new Date(order.createdAt).toLocaleDateString('en-US', {
+            const orderDate = new Date(order.created_at).toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'short',
               day: 'numeric'
@@ -68,7 +166,7 @@ const Orders = () => {
                     <p className="text-sm text-muted-foreground mb-1">
                       {orderDate}
                     </p>
-                    <p className="font-medium">Order #{order.id}</p>
+                    <p className="font-medium">Order #{order.id.substring(0, 8)}</p>
                   </div>
                   
                   <div className="flex items-center gap-4">

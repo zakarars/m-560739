@@ -1,31 +1,30 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getProductById } from "@/data/products";
+import { useQuery } from "@tanstack/react-query";
+import { getProductById } from "@/services/productService";
 import { Product } from "@/types";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useCart } from "@/context/CartContext";
 
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [product, setProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const { addToCart } = useCart();
 
-  useEffect(() => {
-    if (id) {
-      const foundProduct = getProductById(id);
-      if (foundProduct) {
-        setProduct(foundProduct);
-      } else {
-        navigate("/shop");
-      }
-    }
-  }, [id, navigate]);
+  const { 
+    data: product, 
+    isLoading,
+    error
+  } = useQuery({
+    queryKey: ['product', id],
+    queryFn: () => getProductById(id as string),
+    enabled: !!id,
+  });
 
   const handleAddToCart = () => {
     if (product) {
@@ -33,11 +32,25 @@ const ProductDetail = () => {
     }
   };
 
-  if (!product) {
+  if (isLoading) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-16">
-          <p>Loading product...</p>
+        <div className="container mx-auto px-4 py-16 flex justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-16 text-center">
+          <h1 className="text-2xl font-bold mb-4">Product Not Found</h1>
+          <p className="mb-6 text-muted-foreground">The product you're looking for doesn't exist or has been removed.</p>
+          <Button onClick={() => navigate("/shop")}>
+            Return to Shop
+          </Button>
         </div>
       </Layout>
     );
