@@ -13,6 +13,7 @@ import Layout from "@/components/Layout";
 const Auth = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("login");
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState("");
@@ -76,7 +77,10 @@ const Auth = () => {
         toast.success("Signup successful", {
           description: "Please check your email to verify your account."
         });
-        // Keep them on the authentication page
+        // Switch to login tab after successful signup
+        setActiveTab("login");
+        // Pre-fill the login form with the email they just registered
+        setLoginEmail(signupEmail);
       }
     } catch (error) {
       toast.error("Something went wrong");
@@ -98,7 +102,7 @@ const Auth = () => {
         </div>
         
         <div className="border rounded-lg p-6 shadow-sm">
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid grid-cols-2 mb-6">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Sign up</TabsTrigger>
