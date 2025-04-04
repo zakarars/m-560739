@@ -21,6 +21,7 @@ export async function getProducts(): Promise<Product[]> {
 }
 
 export async function getProductsByCategory(category: string): Promise<Product[]> {
+  // If category is 'all', fetch all products without filtering by category
   let query = supabase.from('products').select('*')
   
   if (category !== 'all') {
