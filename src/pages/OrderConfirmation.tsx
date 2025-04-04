@@ -1,11 +1,36 @@
+
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, Home, Package, ShoppingCart, Clock } from "lucide-react";
+import { 
+  CheckCircle, 
+  Home, 
+  Package, 
+  ShoppingCart, 
+  Clock,
+  Check,
+  Truck,
+  PackageCheck 
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Order, OrderItem, fromDbOrder } from "@/types/orders";
+import { Order, OrderItem, fromDbOrder, OrderStatus } from "@/types/orders";
+
+// Order status components
+const statusIcons = {
+  pending: <Clock className="h-6 w-6 text-yellow-500" />,
+  processing: <Check className="h-6 w-6 text-blue-500" />,
+  shipped: <Truck className="h-6 w-6 text-purple-500" />,
+  delivered: <PackageCheck className="h-6 w-6 text-green-500" />,
+};
+
+const statusLabels = {
+  pending: "Pending",
+  processing: "Processing",
+  shipped: "Shipped",
+  delivered: "Delivered",
+};
 
 const OrderConfirmation = () => {
   const { orderId } = useParams();
@@ -103,9 +128,18 @@ const OrderConfirmation = () => {
         </div>
         
         <h1 className="text-3xl font-bold text-center mb-2">Order Confirmed</h1>
-        <p className="text-center text-muted-foreground mb-10">
+        <p className="text-center text-muted-foreground mb-6">
           Thank you for your purchase! Your order has been received.
         </p>
+        
+        <div className="flex items-center justify-center mb-10">
+          <div className="flex items-center gap-2 px-4 py-2 bg-muted rounded-full">
+            {statusIcons[order.status as OrderStatus]}
+            <span className="font-medium">
+              Status: {statusLabels[order.status as OrderStatus]}
+            </span>
+          </div>
+        </div>
         
         <div className="bg-background rounded-lg border p-6 mb-8">
           <div className="flex items-center justify-between mb-4">
