@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -16,28 +15,12 @@ import {
 import {
   ShoppingBag,
   Clock,
-  Check,
-  Truck,
-  PackageCheck,
   ArrowRight,
 } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Order, OrderStatus, fromDbOrder } from "@/types/orders";
-
-const statusIcons = {
-  pending: <Clock className="h-4 w-4 text-yellow-500" />,
-  processing: <Check className="h-4 w-4 text-blue-500" />,
-  shipped: <Truck className="h-4 w-4 text-purple-500" />,
-  delivered: <PackageCheck className="h-4 w-4 text-green-500" />,
-};
-
-const statusLabels = {
-  pending: "Pending",
-  processing: "Processing",
-  shipped: "Shipped",
-  delivered: "Delivered",
-};
+import { statusIcons, statusLabels } from "@/components/orders/OrderStatusIcons";
 
 const Orders = () => {
   const { user } = useAuth();

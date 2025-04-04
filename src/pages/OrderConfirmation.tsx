@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -8,29 +7,11 @@ import {
   CheckCircle, 
   Home, 
   Package, 
-  ShoppingCart, 
-  Clock,
-  Check,
-  Truck,
-  PackageCheck 
+  ShoppingCart 
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Order, OrderItem, fromDbOrder, OrderStatus } from "@/types/orders";
-
-// Order status components
-const statusIcons = {
-  pending: <Clock className="h-6 w-6 text-yellow-500" />,
-  processing: <Check className="h-6 w-6 text-blue-500" />,
-  shipped: <Truck className="h-6 w-6 text-purple-500" />,
-  delivered: <PackageCheck className="h-6 w-6 text-green-500" />,
-};
-
-const statusLabels = {
-  pending: "Pending",
-  processing: "Processing",
-  shipped: "Shipped",
-  delivered: "Delivered",
-};
+import { statusIcons, statusLabels } from "@/components/orders/OrderStatusIcons";
 
 const OrderConfirmation = () => {
   const { orderId } = useParams();
@@ -43,7 +24,6 @@ const OrderConfirmation = () => {
     async function fetchOrderDetails() {
       setIsLoading(true);
       try {
-        // Get order details
         const { data: orderData, error: orderError } = await supabase
           .from("orders")
           .select("*")
@@ -52,10 +32,8 @@ const OrderConfirmation = () => {
         
         if (orderError) throw orderError;
 
-        // Convert from DB format to our app format
         const typedOrder = fromDbOrder(orderData);
 
-        // Get order items and join with products
         const { data: itemsData, error: itemsError } = await supabase
           .from("order_items")
           .select(`
@@ -68,12 +46,11 @@ const OrderConfirmation = () => {
         
         if (itemsError) throw itemsError;
 
-        // Transform product data to match our expected format
         const transformedItems = itemsData.map(item => ({
           ...item,
           product: {
             ...item.products,
-            imageUrl: item.products.imageurl // Fix imageUrl field
+            imageUrl: item.products.imageurl
           }
         }));
 
@@ -103,7 +80,7 @@ const OrderConfirmation = () => {
     );
   }
 
-  if (error || !order) {
+  if (error) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-16 text-center">
@@ -118,13 +95,26 @@ const OrderConfirmation = () => {
     );
   }
 
+  if (!order) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-16 text-center">
+          <h1 className="text-2xl font-bold text-destructive mb-4">
+            Order not found
+          </h1>
+          <Button asChild>
+            <Link to="/shop">Continue Shopping</Link>
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
-      <div className="container max-w-4xl mx-auto px-4 py-10">
-        <div className="flex items-center justify-center mb-6">
-          <div className="bg-primary/10 rounded-full p-3">
-            <CheckCircle className="h-10 w-10 text-primary" strokeWidth={1.5} />
-          </div>
+      <div className="container max-w-4xl mx-auto px-4 py-8">
+        <div className="text-center mb-8">
+          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
         </div>
         
         <h1 className="text-3xl font-bold text-center mb-2">Order Confirmed</h1>
