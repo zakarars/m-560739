@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -49,7 +48,7 @@ import { toast } from "sonner";
 
 // Hardcoded list of admin emails for demo purposes
 // In a real app, you would have a proper role-based system
-const ADMIN_EMAILS = ["admin@example.com"];
+const ADMIN_EMAILS = ["arsen.zakaryan@gmail.com"];
 
 // Order status components
 const statusIcons = {
@@ -71,11 +70,11 @@ const AdminOrders = () => {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   // Check if user is an admin
-  const isAdmin = user && ADMIN_EMAILS.includes(user.email || '');
+  const isAdmin = user && ADMIN_EMAILS.includes(user.email || "");
 
   useEffect(() => {
     async function fetchAllOrders() {
@@ -89,15 +88,15 @@ const AdminOrders = () => {
           .from("orders")
           .select("*")
           .order("created_at", { ascending: false });
-        
+
         if (fetchError) throw fetchError;
 
-        const typedOrders = data ? data.map(order => fromDbOrder(order)) : [];
-        
+        const typedOrders = data ? data.map((order) => fromDbOrder(order)) : [];
+
         setOrders(typedOrders);
       } catch (err) {
         console.error("Error fetching orders:", err);
-        setError('Failed to load orders');
+        setError("Failed to load orders");
       } finally {
         setIsLoading(false);
       }
@@ -106,26 +105,35 @@ const AdminOrders = () => {
     fetchAllOrders();
   }, [user, isAdmin]);
 
-  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+  const handleStatusChange = async (
+    orderId: string,
+    newStatus: OrderStatus
+  ) => {
     try {
       const { error } = await supabase
-        .from('orders')
+        .from("orders")
         .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', orderId);
-      
+        .eq("id", orderId);
+
       if (error) throw error;
-      
+
       // Update the local state to reflect the change
-      setOrders(orders.map(order => 
-        order.id === orderId 
-          ? { ...order, status: newStatus, updated_at: new Date().toISOString() } 
-          : order
-      ));
-      
+      setOrders(
+        orders.map((order) =>
+          order.id === orderId
+            ? {
+                ...order,
+                status: newStatus,
+                updated_at: new Date().toISOString(),
+              }
+            : order
+        )
+      );
+
       toast.success(`Order status updated to ${statusLabels[newStatus]}`);
     } catch (error) {
-      console.error('Error updating order status:', error);
-      toast.error('Failed to update order status');
+      console.error("Error updating order status:", error);
+      toast.error("Failed to update order status");
     }
   };
 
@@ -202,9 +210,9 @@ const AdminOrders = () => {
                 {orders.length} {orders.length === 1 ? "order" : "orders"}
               </p>
             </div>
-            
+
             <Separator />
-            
+
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -226,14 +234,14 @@ const AdminOrders = () => {
                       <TableCell>
                         {format(new Date(order.created_at), "MMM d, yyyy")}
                       </TableCell>
-                      <TableCell>
-                        {order.shipping_address.fullName}
-                      </TableCell>
+                      <TableCell>{order.shipping_address.fullName}</TableCell>
                       <TableCell>${order.total.toFixed(2)}</TableCell>
                       <TableCell>
-                        <Select 
-                          defaultValue={order.status} 
-                          onValueChange={(value) => handleStatusChange(order.id, value as OrderStatus)}
+                        <Select
+                          defaultValue={order.status}
+                          onValueChange={(value) =>
+                            handleStatusChange(order.id, value as OrderStatus)
+                          }
                         >
                           <SelectTrigger className="w-[130px]">
                             <SelectValue placeholder="Status" />
@@ -274,7 +282,11 @@ const AdminOrders = () => {
                             size="sm"
                             className="flex items-center"
                           >
-                            <a href={`/order-confirmation/${order.id}`} target="_blank" rel="noopener noreferrer">
+                            <a
+                              href={`/order-confirmation/${order.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
                               <Eye className="h-4 w-4 mr-1" />
                               View
                             </a>
