@@ -14,6 +14,7 @@ import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import OrderConfirmation from "./pages/OrderConfirmation";
 import Orders from "./pages/Orders";
+import AdminOrders from "./pages/AdminOrders";
 import OurStory from "./pages/OurStory";
 import Auth from "./pages/Auth";
 import AuthError from "./pages/AuthError";
@@ -44,6 +45,7 @@ const App = () => (
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
               <Route path="/orders" element={<Orders />} />
+              <Route path="/admin/orders" element={<AdminOrders />} />
               <Route path="/our-story" element={<OurStory />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/error" element={<AuthError />} />

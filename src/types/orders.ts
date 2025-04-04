@@ -27,6 +27,7 @@ export interface Order {
   id: string;
   user_id: string;
   total: number;
+  shipping_cost: number;
   status: OrderStatus;
   shipping_address: ShippingAddress;
   created_at: string;
@@ -46,10 +47,20 @@ export function fromDbOrder(dbOrder: any): Order {
     id: dbOrder.id,
     user_id: dbOrder.user_id,
     total: dbOrder.total,
+    shipping_cost: dbOrder.shipping_cost || 0, // Default to 0 if not present
     status,
     shipping_address,
     created_at: dbOrder.created_at,
     updated_at: dbOrder.updated_at,
     items: dbOrder.items
   };
+}
+
+// New helper function to calculate shipping cost based on location
+export function calculateShippingCost(address: ShippingAddress): number {
+  // Check if the city is Yerevan (case insensitive)
+  if (address.city.toLowerCase() === 'yerevan') {
+    return 5.00; // $5 delivery fee for Yerevan
+  }
+  return 0; // Free shipping for other locations
 }

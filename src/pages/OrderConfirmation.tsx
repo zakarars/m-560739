@@ -147,11 +147,15 @@ const OrderConfirmation = () => {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span>Subtotal</span>
-              <span>${order.total.toFixed(2)}</span>
+              <span>${(order.total - (order.shipping_cost || 0)).toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span>Shipping</span>
-              <span>Free</span>
+              <span>
+                {order.shipping_cost > 0 
+                  ? `$${order.shipping_cost.toFixed(2)}` 
+                  : 'Free'}
+              </span>
             </div>
             <div className="flex justify-between font-semibold pt-2">
               <span>Total</span>

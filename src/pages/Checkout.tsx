@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { v4 as uuidv4 } from "uuid";
 import Layout from "@/components/Layout";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
@@ -12,12 +11,14 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, CreditCard, ShoppingBag, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { calculateShippingCost } from "@/types/orders";
 
 const Checkout = () => {
   const navigate = useNavigate();
   const { cart, getCartTotal, clearCart } = useCart();
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [shippingCost, setShippingCost] = useState(0);
   
   // Form state
   const [fullName, setFullName] = useState("");
@@ -45,6 +46,16 @@ const Checkout = () => {
     }
   }, [cart, navigate, user]);
   
+  // Update shipping cost when city changes
+  useEffect(() => {
+    if (city) {
+      const cost = calculateShippingCost({
+        fullName, address, city, state, zipCode, country
+      });
+      setShippingCost(cost);
+    }
+  }, [city, fullName, address, state, zipCode, country]);
+  
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -67,8 +78,10 @@ const Checkout = () => {
         country
       };
       
-      // Calculate total
-      const total = getCartTotal();
+      // Calculate total and shipping
+      const subtotal = getCartTotal();
+      const shipping = calculateShippingCost(shippingAddress);
+      const total = subtotal + shipping;
       
       // Create order in Supabase
       const { data: order, error: orderError } = await supabase
@@ -76,6 +89,7 @@ const Checkout = () => {
         .insert({
           user_id: user.id,
           total,
+          shipping_cost: shipping,
           shipping_address: shippingAddress,
           status: "pending"
         })
@@ -274,13 +288,20 @@ const Checkout = () => {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Shipping</span>
-                  <span>Free</span>
+                  <span>
+                    {shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : 'Free'}
+                  </span>
                 </div>
                 <Separator className="my-2" />
                 <div className="flex justify-between font-semibold">
                   <span>Total</span>
-                  <span>${getCartTotal().toFixed(2)}</span>
+                  <span>${(getCartTotal() + shippingCost).toFixed(2)}</span>
                 </div>
+                {city.toLowerCase() === 'yerevan' && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    $5.00 delivery fee applied for Yerevan
+                  </p>
+                )}
               </div>
             </div>
           </div>
