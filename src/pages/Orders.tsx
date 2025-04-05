@@ -22,6 +22,7 @@ import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Order, OrderStatus, fromDbOrder } from "@/types/orders";
 import { statusIcons, statusLabels } from "@/components/orders/OrderStatusIcons";
+import { toast } from "sonner";
 
 const Orders = () => {
   const { user } = useAuth();
@@ -46,6 +47,7 @@ const Orders = () => {
         if (fetchError) throw fetchError;
 
         const typedOrders = data ? data.map(order => fromDbOrder(order)) : [];
+        console.log("Fetched orders:", typedOrders);
         
         setOrders(typedOrders);
       } catch (err) {
@@ -73,14 +75,21 @@ const Orders = () => {
           filter: `user_id=eq.${user.id}`
         }, 
         (payload) => {
-          console.log("Real-time update received:", payload);
+          console.log("User real-time update received:", payload);
+          
           // Update the local state when an order is updated
           setOrders(currentOrders => 
-            currentOrders.map(order => 
-              order.id === payload.new.id 
-                ? fromDbOrder(payload.new) 
-                : order
-            )
+            currentOrders.map(order => {
+              if (order.id === payload.new.id) {
+                const updatedOrder = fromDbOrder(payload.new);
+                // Show a toast notification when status changes
+                if (order.status !== updatedOrder.status) {
+                  toast.info(`Order #${payload.new.id.substring(0, 8)} status changed to ${updatedOrder.status}`);
+                }
+                return updatedOrder;
+              }
+              return order;
+            })
           );
         }
       )

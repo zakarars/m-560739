@@ -1,4 +1,3 @@
-
 import { OrderStatus } from "@/types/orders";
 import {
   Select,
@@ -8,6 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { statusIcons, statusLabels } from "./OrderStatusIcons";
+import { useState } from "react";
 
 interface OrderStatusSelectProps {
   status: OrderStatus;
@@ -20,12 +20,31 @@ export const OrderStatusSelect = ({
   onStatusChange,
   orderId,
 }: OrderStatusSelectProps) => {
+  const [currentStatus, setCurrentStatus] = useState<OrderStatus>(status);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (newStatus === currentStatus) return;
+    
+    try {
+      setIsUpdating(true);
+      await onStatusChange(orderId, newStatus as OrderStatus);
+      setCurrentStatus(newStatus as OrderStatus);
+    } catch (error) {
+      console.error("Error updating status:", error);
+      // Keep the old status on error
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return (
     <Select
-      defaultValue={status}
-      onValueChange={(value) => onStatusChange(orderId, value as OrderStatus)}
+      value={currentStatus}
+      onValueChange={handleStatusChange}
+      disabled={isUpdating}
     >
-      <SelectTrigger className="w-[130px]">
+      <SelectTrigger className={`w-[130px] ${isUpdating ? 'opacity-70' : ''}`}>
         <SelectValue placeholder="Status" />
       </SelectTrigger>
       <SelectContent>

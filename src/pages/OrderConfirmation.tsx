@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { 
   CheckCircle, 
-  Home, 
   Package, 
   ShoppingCart,
   Clock 
@@ -14,6 +13,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { Order, OrderItem, fromDbOrder, OrderStatus } from "@/types/orders";
 import { statusIcons, statusLabels } from "@/components/orders/OrderStatusIcons";
+import { toast } from "sonner";
 
 const OrderConfirmation = () => {
   const { orderId } = useParams();
@@ -35,6 +35,7 @@ const OrderConfirmation = () => {
         if (orderError) throw orderError;
 
         const typedOrder = fromDbOrder(orderData);
+        console.log("Fetched order:", typedOrder);
 
         const { data: itemsData, error: itemsError } = await supabase
           .from("order_items")
@@ -70,6 +71,40 @@ const OrderConfirmation = () => {
       fetchOrderDetails();
     }
   }, [orderId]);
+
+  // Setup real-time subscription for this specific order
+  useEffect(() => {
+    if (!orderId) return;
+    
+    const channel = supabase
+      .channel(`order-${orderId}`)
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'orders',
+          filter: `id=eq.${orderId}`
+        }, 
+        (payload) => {
+          console.log("Order confirmation real-time update received:", payload);
+          
+          // Update the order state when it changes
+          const updatedOrder = fromDbOrder(payload.new);
+          
+          // Show toast if status changed
+          if (order && order.status !== updatedOrder.status) {
+            toast.info(`Order status updated to ${updatedOrder.status}`);
+          }
+          
+          setOrder(updatedOrder);
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [orderId, order]);
 
   if (isLoading) {
     return (

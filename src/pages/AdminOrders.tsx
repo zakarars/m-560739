@@ -69,6 +69,7 @@ const AdminOrders = () => {
           table: 'orders'
         }, 
         (payload) => {
+          console.log("Admin real-time update received:", payload);
           // Update the local state when an order is updated
           setOrders(currentOrders => 
             currentOrders.map(order => 
@@ -79,7 +80,7 @@ const AdminOrders = () => {
           );
           
           // Show a toast notification when an order is updated
-          toast.info(`Order #${payload.new.id.substring(0, 8)} updated`);
+          toast.info(`Order #${payload.new.id.substring(0, 8)} updated to ${payload.new.status}`);
         }
       )
       .subscribe();
@@ -94,15 +95,23 @@ const AdminOrders = () => {
     newStatus: OrderStatus
   ) => {
     try {
-      const { error } = await supabase
+      console.log("Updating order status:", orderId, "to", newStatus);
+      
+      const { data, error } = await supabase
         .from("orders")
         .update({ 
           status: newStatus, 
           updated_at: new Date().toISOString() 
         })
-        .eq("id", orderId);
+        .eq("id", orderId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error updating order status:", error);
+        throw error;
+      }
+
+      console.log("Update response:", data);
 
       // Update the local state to reflect the change
       setOrders(
