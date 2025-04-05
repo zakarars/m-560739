@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -56,6 +57,37 @@ const Orders = () => {
     }
 
     fetchOrders();
+  }, [user]);
+
+  // Setup a real-time subscription to listen for order updates
+  useEffect(() => {
+    if (!user) return;
+    
+    const channel = supabase
+      .channel('orders-updates')
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'orders',
+          filter: `user_id=eq.${user.id}`
+        }, 
+        (payload) => {
+          // Update the local state when an order is updated
+          setOrders(currentOrders => 
+            currentOrders.map(order => 
+              order.id === payload.new.id 
+                ? fromDbOrder(payload.new) 
+                : order
+            )
+          );
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   if (isLoading) {

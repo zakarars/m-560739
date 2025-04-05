@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -96,7 +95,10 @@ const Checkout = () => {
         .select()
         .single();
       
-      if (orderError) throw orderError;
+      if (orderError) {
+        console.error("Order creation error:", orderError);
+        throw new Error(`Failed to create order: ${orderError.message}`);
+      }
       
       // Create order items
       const orderItems = cart.map(item => ({
@@ -110,11 +112,15 @@ const Checkout = () => {
         .from("order_items")
         .insert(orderItems);
       
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error("Order items error:", itemsError);
+        throw new Error(`Failed to create order items: ${itemsError.message}`);
+      }
       
       // Clear the cart and navigate to confirmation
       clearCart();
       navigate(`/order-confirmation/${order.id}`);
+      toast.success("Order placed successfully!");
       
     } catch (error) {
       console.error("Error creating order:", error);
