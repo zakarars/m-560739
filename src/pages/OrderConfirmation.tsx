@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -7,7 +8,8 @@ import {
   CheckCircle, 
   Home, 
   Package, 
-  ShoppingCart 
+  ShoppingCart,
+  Clock 
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Order, OrderItem, fromDbOrder, OrderStatus } from "@/types/orders";
