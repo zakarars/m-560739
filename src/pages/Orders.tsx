@@ -73,6 +73,7 @@ const Orders = () => {
           filter: `user_id=eq.${user.id}`
         }, 
         (payload) => {
+          console.log("Real-time update received:", payload);
           // Update the local state when an order is updated
           setOrders(currentOrders => 
             currentOrders.map(order => 
