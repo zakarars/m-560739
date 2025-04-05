@@ -56,7 +56,7 @@ export function fromDbOrder(dbOrder: any): Order {
   };
 }
 
-// New helper function to calculate shipping cost based on location
+// Helper function to calculate shipping cost based on location
 export function calculateShippingCost(address: ShippingAddress): number {
   // Check if the city is Yerevan (case insensitive)
   if (address.city.toLowerCase() === 'yerevan') {

@@ -5,7 +5,6 @@ import Layout from "@/components/Layout";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingBag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Order, OrderStatus, fromDbOrder } from "@/types/orders";
 import { toast } from "sonner";
@@ -54,6 +53,40 @@ const AdminOrders = () => {
     }
 
     fetchAllOrders();
+  }, [user, isAdmin]);
+
+  // Setup a real-time subscription to listen for order updates
+  useEffect(() => {
+    if (!user || !isAdmin) return;
+    
+    // Enable realtime updates for the orders table if admin
+    const channel = supabase
+      .channel('admin-orders-updates')
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'orders'
+        }, 
+        (payload) => {
+          // Update the local state when an order is updated
+          setOrders(currentOrders => 
+            currentOrders.map(order => 
+              order.id === payload.new.id 
+                ? fromDbOrder(payload.new) 
+                : order
+            )
+          );
+          
+          // Show a toast notification when an order is updated
+          toast.info(`Order #${payload.new.id.substring(0, 8)} updated`);
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user, isAdmin]);
 
   const handleStatusChange = async (

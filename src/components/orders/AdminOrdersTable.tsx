@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { OrderStatusSelect } from "./OrderStatusSelect";
+import { Link } from "react-router-dom";
 
 interface AdminOrdersTableProps {
   orders: Order[];
@@ -54,23 +55,21 @@ export const AdminOrdersTable = ({
                 />
               </TableCell>
               <TableCell>
-                <div className="flex items-center gap-2">
-                  <Button
-                    asChild
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center"
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="flex items-center"
+                >
+                  <Link
+                    to={`/order-confirmation/${order.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
-                    <a
-                      href={`/order-confirmation/${order.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View
-                    </a>
-                  </Button>
-                </div>
+                    <Eye className="h-4 w-4 mr-1" />
+                    View
+                  </Link>
+                </Button>
               </TableCell>
             </TableRow>
           ))}
