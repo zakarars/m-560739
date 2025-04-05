@@ -34,6 +34,7 @@ const AdminOrders = () => {
       }
 
       try {
+        console.log("Fetching all orders for admin...");
         const { data, error: fetchError } = await supabase
           .from("orders")
           .select("*")
@@ -41,7 +42,9 @@ const AdminOrders = () => {
 
         if (fetchError) throw fetchError;
 
+        console.log("Fetched orders data:", data);
         const typedOrders = data ? data.map((order) => fromDbOrder(order)) : [];
+        console.log("Processed orders:", typedOrders);
 
         setOrders(typedOrders);
       } catch (err) {
@@ -59,6 +62,8 @@ const AdminOrders = () => {
   useEffect(() => {
     if (!user || !isAdmin) return;
     
+    console.log("Setting up real-time subscription for admin...");
+    
     // Enable realtime updates for the orders table if admin
     const channel = supabase
       .channel('admin-orders-updates')
@@ -70,22 +75,28 @@ const AdminOrders = () => {
         }, 
         (payload) => {
           console.log("Admin real-time update received:", payload);
+          
           // Update the local state when an order is updated
-          setOrders(currentOrders => 
-            currentOrders.map(order => 
+          setOrders(currentOrders => {
+            const updatedOrders = currentOrders.map(order => 
               order.id === payload.new.id 
                 ? fromDbOrder(payload.new) 
                 : order
-            )
-          );
+            );
+            console.log("Updated orders state:", updatedOrders);
+            return updatedOrders;
+          });
           
           // Show a toast notification when an order is updated
           toast.info(`Order #${payload.new.id.substring(0, 8)} updated to ${payload.new.status}`);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Subscription status:", status);
+      });
       
     return () => {
+      console.log("Cleaning up real-time subscription...");
       supabase.removeChannel(channel);
     };
   }, [user, isAdmin]);
@@ -127,9 +138,11 @@ const AdminOrders = () => {
       );
 
       toast.success(`Order status updated to ${newStatus}`);
+      return data;
     } catch (error) {
       console.error("Error updating order status:", error);
       toast.error("Failed to update order status");
+      throw error;
     }
   };
 
