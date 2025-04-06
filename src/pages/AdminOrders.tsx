@@ -110,12 +110,31 @@ const AdminOrders = () => {
     newStatus: OrderStatus
   ) => {
     try {
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq("id", orderId);
+      // First validate the status is a valid OrderStatus
+      if (
+        !["pending", "processing", "shipped", "delivered"].includes(newStatus)
+      ) {
+        throw new Error("Invalid status");
+      }
 
-      if (error) throw error;
+      const { error, data } = await supabase
+        .from("orders")
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", orderId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Supabase error:", error);
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error("No order found with this ID");
+      }
 
       // Update the local state to reflect the change
       setOrders(
