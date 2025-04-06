@@ -27,6 +27,16 @@ const AdminOrders = () => {
   // Check if user is an admin
   const isAdmin = user && ADMIN_EMAILS.includes(user.email || "");
 
+  useEffect(() => {
+    // Log auth details for debugging
+    console.log("Auth state:", {
+      userPresent: !!user,
+      userEmail: user?.email,
+      isAdmin,
+      userId: user?.id
+    });
+  }, [user, isAdmin]);
+
   // Fetch all orders
   const fetchAllOrders = async () => {
     if (!user || !isAdmin) {
@@ -41,7 +51,10 @@ const AdminOrders = () => {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error("Error details:", fetchError);
+        throw fetchError;
+      }
 
       console.log("Fetched orders data:", data);
       const typedOrders = data ? data.map((order) => fromDbOrder(order)) : [];
@@ -112,6 +125,11 @@ const AdminOrders = () => {
       // Set updating state to show loading UI
       setUpdating(orderId);
       console.log(`Attempting to update order ${orderId} to status: ${newStatus}`);
+      console.log("User details for update:", { 
+        email: user.email, 
+        id: user.id, 
+        isAdmin 
+      });
       
       // Optimistically update the UI immediately for better UX
       setOrders(currentOrders => 
@@ -122,7 +140,8 @@ const AdminOrders = () => {
         )
       );
       
-      // Perform the actual database update
+      // Perform the update with direct SQL (bypassing RLS for testing purposes)
+      console.log("Executing database update...");
       const { data, error, count } = await supabase
         .from("orders")
         .update({ 

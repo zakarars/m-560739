@@ -25,6 +25,16 @@ export const AdminOrdersTable = ({
   onStatusChange,
   updatingOrderId,
 }: AdminOrdersTableProps) => {
+  const handleStatusChange = async (orderId: string, status: OrderStatus) => {
+    console.log(`AdminOrdersTable: Requesting status change for order ${orderId} to ${status}`);
+    try {
+      await onStatusChange(orderId, status);
+    } catch (error) {
+      console.error("AdminOrdersTable: Error in status change:", error);
+      // Error handling is done in parent component
+    }
+  };
+
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -59,7 +69,7 @@ export const AdminOrdersTable = ({
                 <TableCell>
                   <OrderStatusSelect
                     status={order.status}
-                    onStatusChange={onStatusChange}
+                    onStatusChange={handleStatusChange}
                     orderId={order.id}
                     isUpdating={updatingOrderId === order.id}
                   />
