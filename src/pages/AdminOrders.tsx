@@ -61,15 +61,14 @@ const AdminOrders = () => {
     fetchAllOrders();
   }, [user, isAdmin]);
 
-  // Setup a real-time subscription to listen for order updates
+  // Setup a real-time subscription for order updates
   useEffect(() => {
     if (!user || !isAdmin) return;
     
     console.log("Setting up real-time subscription for admin...");
     
-    // Enable realtime updates for the orders table if admin
     const channel = supabase
-      .channel('admin-orders-updates')
+      .channel('admin-orders-changes')
       .on('postgres_changes', 
         { 
           event: 'UPDATE', 
@@ -82,16 +81,15 @@ const AdminOrders = () => {
           // Update the local state when an order is updated
           setOrders(currentOrders => {
             const updatedOrder = fromDbOrder(payload.new);
-            const updatedOrders = currentOrders.map(order => 
+            return currentOrders.map(order => 
               order.id === updatedOrder.id ? updatedOrder : order
             );
-            
-            console.log("Updated orders state:", updatedOrders);
-            return updatedOrders;
           });
           
-          // Show a toast notification when an order is updated
-          toast.info(`Order #${payload.new.id.substring(0, 8)} updated to ${payload.new.status}`);
+          // Only show a toast if this wasn't triggered by our own update
+          if (updating !== payload.new.id) {
+            toast.info(`Order #${payload.new.id.substring(0, 8)} was updated to ${payload.new.status}`);
+          }
         }
       )
       .subscribe((status) => {
@@ -102,41 +100,30 @@ const AdminOrders = () => {
       console.log("Cleaning up real-time subscription...");
       supabase.removeChannel(channel);
     };
-  }, [user, isAdmin]);
+  }, [user, isAdmin, updating]);
 
-  // Completely rebuilt status update function
-  const handleStatusChange = async (
-    orderId: string,
-    newStatus: OrderStatus
-  ): Promise<void> => {
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus): Promise<void> => {
+    if (!user || !isAdmin) {
+      toast.error("You don't have permission to update orders");
+      return;
+    }
+
     try {
       // Set updating state to show loading UI
       setUpdating(orderId);
-      console.log(`Updating order ${orderId} to status: ${newStatus}`);
+      console.log(`Attempting to update order ${orderId} to status: ${newStatus}`);
       
-      // Step 1: Verify the order exists before attempting to update
-      const { data: existingOrder, error: checkError } = await supabase
-        .from("orders")
-        .select("id, status")
-        .eq("id", orderId)
-        .maybeSingle();
+      // Optimistically update the UI immediately for better UX
+      setOrders(currentOrders => 
+        currentOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, status: newStatus, updated_at: new Date().toISOString() } 
+            : order
+        )
+      );
       
-      if (checkError) {
-        console.error("Error checking order existence:", checkError);
-        toast.error(`Error verifying order: ${checkError.message}`);
-        return;
-      }
-      
-      if (!existingOrder) {
-        console.error("Order not found:", orderId);
-        toast.error("Cannot update: Order not found in database");
-        return;
-      }
-      
-      console.log("Found order to update:", existingOrder);
-      
-      // Step 2: Perform the update operation
-      const { data, error: updateError } = await supabase
+      // Perform the actual database update
+      const { data, error, count } = await supabase
         .from("orders")
         .update({ 
           status: newStatus, 
@@ -145,31 +132,57 @@ const AdminOrders = () => {
         .eq("id", orderId)
         .select();
       
-      if (updateError) {
-        console.error("Database error updating order status:", updateError);
-        toast.error(`Update failed: ${updateError.message}`);
+      console.log("Update response:", { data, error, count });
+      
+      if (error) {
+        // Revert the optimistic update on error
+        setOrders(currentOrders => 
+          currentOrders.map(order => {
+            // Find the original order to revert to
+            const originalOrder = orders.find(o => o.id === orderId);
+            return order.id === orderId && originalOrder 
+              ? originalOrder 
+              : order;
+          })
+        );
+        
+        console.error("Database error updating order status:", error);
+        toast.error(`Update failed: ${error.message}`);
         return;
       }
       
       if (!data || data.length === 0) {
+        // Revert the optimistic update if no records were affected
+        setOrders(currentOrders => 
+          currentOrders.map(order => {
+            // Find the original order to revert to
+            const originalOrder = orders.find(o => o.id === orderId);
+            return order.id === orderId && originalOrder 
+              ? originalOrder 
+              : order;
+          })
+        );
+        
         console.error("No records were updated for ID:", orderId);
         toast.error("Update failed: No records affected");
         return;
       }
       
-      console.log("Update successful, response:", data);
-      
-      // Local state update is handled by the realtime subscription,
-      // but we'll update it here too for immediate feedback
-      const updatedOrder = fromDbOrder(data[0]);
-      setOrders(currentOrders =>
-        currentOrders.map(order =>
-          order.id === orderId ? updatedOrder : order
-        )
-      );
-      
+      // Update succeeded - no need to update state again since we did it optimistically
+      console.log("Successfully updated order:", data[0]);
       toast.success(`Order #${orderId.substring(0, 8)} updated to ${newStatus}`);
     } catch (error: any) {
+      // Revert the optimistic update on exception
+      setOrders(currentOrders => 
+        currentOrders.map(order => {
+          // Find the original order to revert to
+          const originalOrder = orders.find(o => o.id === orderId);
+          return order.id === orderId && originalOrder 
+            ? originalOrder 
+            : order;
+        })
+      );
+      
       console.error("Unexpected error during update:", error);
       toast.error(`Update failed: ${error?.message || "Unknown error"}`);
     } finally {
