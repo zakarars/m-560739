@@ -1,11 +1,19 @@
+
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, Home, Package, ShoppingCart, Clock } from "lucide-react";
+import { 
+  CheckCircle, 
+  Package, 
+  ShoppingCart,
+  Clock 
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Order, OrderItem, fromDbOrder } from "@/types/orders";
+import { Order, OrderItem, fromDbOrder, OrderStatus } from "@/types/orders";
+import { statusIcons, statusLabels } from "@/components/orders/OrderStatusIcons";
+import { toast } from "sonner";
 
 const OrderConfirmation = () => {
   const { orderId } = useParams();
@@ -18,7 +26,6 @@ const OrderConfirmation = () => {
     async function fetchOrderDetails() {
       setIsLoading(true);
       try {
-        // Get order details
         const { data: orderData, error: orderError } = await supabase
           .from("orders")
           .select("*")
@@ -27,10 +34,9 @@ const OrderConfirmation = () => {
         
         if (orderError) throw orderError;
 
-        // Convert from DB format to our app format
         const typedOrder = fromDbOrder(orderData);
+        console.log("Fetched order:", typedOrder);
 
-        // Get order items and join with products
         const { data: itemsData, error: itemsError } = await supabase
           .from("order_items")
           .select(`
@@ -43,12 +49,11 @@ const OrderConfirmation = () => {
         
         if (itemsError) throw itemsError;
 
-        // Transform product data to match our expected format
         const transformedItems = itemsData.map(item => ({
           ...item,
           product: {
             ...item.products,
-            imageUrl: item.products.imageurl // Fix imageUrl field
+            imageUrl: item.products.imageurl
           }
         }));
 
@@ -67,6 +72,40 @@ const OrderConfirmation = () => {
     }
   }, [orderId]);
 
+  // Setup real-time subscription for this specific order
+  useEffect(() => {
+    if (!orderId) return;
+    
+    const channel = supabase
+      .channel(`order-${orderId}`)
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'orders',
+          filter: `id=eq.${orderId}`
+        }, 
+        (payload) => {
+          console.log("Order confirmation real-time update received:", payload);
+          
+          // Update the order state when it changes
+          const updatedOrder = fromDbOrder(payload.new);
+          
+          // Show toast if status changed
+          if (order && order.status !== updatedOrder.status) {
+            toast.info(`Order status updated to ${updatedOrder.status}`);
+          }
+          
+          setOrder(updatedOrder);
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [orderId, order]);
+
   if (isLoading) {
     return (
       <Layout>
@@ -78,7 +117,7 @@ const OrderConfirmation = () => {
     );
   }
 
-  if (error || !order) {
+  if (error) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-16 text-center">
@@ -93,19 +132,41 @@ const OrderConfirmation = () => {
     );
   }
 
+  if (!order) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-16 text-center">
+          <h1 className="text-2xl font-bold text-destructive mb-4">
+            Order not found
+          </h1>
+          <Button asChild>
+            <Link to="/shop">Continue Shopping</Link>
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
-      <div className="container max-w-4xl mx-auto px-4 py-10">
-        <div className="flex items-center justify-center mb-6">
-          <div className="bg-primary/10 rounded-full p-3">
-            <CheckCircle className="h-10 w-10 text-primary" strokeWidth={1.5} />
-          </div>
+      <div className="container max-w-4xl mx-auto px-4 py-8">
+        <div className="text-center mb-8">
+          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
         </div>
         
         <h1 className="text-3xl font-bold text-center mb-2">Order Confirmed</h1>
-        <p className="text-center text-muted-foreground mb-10">
+        <p className="text-center text-muted-foreground mb-6">
           Thank you for your purchase! Your order has been received.
         </p>
+        
+        <div className="flex items-center justify-center mb-10">
+          <div className="flex items-center gap-2 px-4 py-2 bg-muted rounded-full">
+            {statusIcons[order.status as OrderStatus]}
+            <span className="font-medium">
+              Status: {statusLabels[order.status as OrderStatus]}
+            </span>
+          </div>
+        </div>
         
         <div className="bg-background rounded-lg border p-6 mb-8">
           <div className="flex items-center justify-between mb-4">

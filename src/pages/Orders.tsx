@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -15,29 +16,14 @@ import {
 import {
   ShoppingBag,
   Clock,
-  Check,
-  Truck,
-  PackageCheck,
   ArrowRight,
   AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Order, OrderStatus, fromDbOrder } from "@/types/orders";
-
-const statusIcons = {
-  pending: <Clock className="h-4 w-4 text-yellow-500" />,
-  processing: <Check className="h-4 w-4 text-blue-500" />,
-  shipped: <Truck className="h-4 w-4 text-purple-500" />,
-  delivered: <PackageCheck className="h-4 w-4 text-green-500" />,
-};
-
-const statusLabels = {
-  pending: "Pending",
-  processing: "Processing",
-  shipped: "Shipped",
-  delivered: "Delivered",
-};
+import { statusIcons, statusLabels } from "@/components/orders/OrderStatusIcons";
+import { toast } from "sonner";
 
 const Orders = () => {
   const { user } = useAuth();
@@ -71,6 +57,7 @@ const Orders = () => {
 
         console.log("Orders fetched:", data);
         const typedOrders = data ? data.map(order => fromDbOrder(order)) : [];
+        console.log("Fetched orders:", typedOrders);
         
         setOrders(typedOrders);
       } catch (err) {
@@ -82,6 +69,45 @@ const Orders = () => {
     }
 
     fetchOrders();
+  }, [user]);
+
+  // Setup a real-time subscription to listen for order updates
+  useEffect(() => {
+    if (!user) return;
+    
+    const channel = supabase
+      .channel('orders-updates')
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'orders',
+          filter: `user_id=eq.${user.id}`
+        }, 
+        (payload) => {
+          console.log("User real-time update received:", payload);
+          
+          // Update the local state when an order is updated
+          setOrders(currentOrders => 
+            currentOrders.map(order => {
+              if (order.id === payload.new.id) {
+                const updatedOrder = fromDbOrder(payload.new);
+                // Show a toast notification when status changes
+                if (order.status !== updatedOrder.status) {
+                  toast.info(`Order #${payload.new.id.substring(0, 8)} status changed to ${updatedOrder.status}`);
+                }
+                return updatedOrder;
+              }
+              return order;
+            })
+          );
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   if (isLoading) {

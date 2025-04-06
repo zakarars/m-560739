@@ -59,6 +59,7 @@ export type Database = {
           created_at: string
           id: string
           shipping_address: Json
+          shipping_cost: number | null
           status: string
           total: number
           updated_at: string
@@ -68,6 +69,7 @@ export type Database = {
           created_at?: string
           id?: string
           shipping_address: Json
+          shipping_cost?: number | null
           status?: string
           total: number
           updated_at?: string
@@ -77,6 +79,7 @@ export type Database = {
           created_at?: string
           id?: string
           shipping_address?: Json
+          shipping_cost?: number | null
           status?: string
           total?: number
           updated_at?: string
