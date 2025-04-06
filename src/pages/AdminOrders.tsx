@@ -104,7 +104,7 @@ const AdminOrders = () => {
   const handleStatusChange = async (
     orderId: string,
     newStatus: OrderStatus
-  ) => {
+  ): Promise<void> => {
     try {
       console.log("Updating order status:", orderId, "to", newStatus);
       
@@ -138,7 +138,7 @@ const AdminOrders = () => {
       );
 
       toast.success(`Order status updated to ${newStatus}`);
-      return data;
+      // We explicitly don't return the data here to match the Promise<void> return type
     } catch (error) {
       console.error("Error updating order status:", error);
       toast.error("Failed to update order status");
