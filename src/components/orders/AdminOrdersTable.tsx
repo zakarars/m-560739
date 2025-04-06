@@ -17,11 +17,13 @@ import { Link } from "react-router-dom";
 interface AdminOrdersTableProps {
   orders: Order[];
   onStatusChange: (orderId: string, status: OrderStatus) => Promise<void>;
+  updatingOrderId: string | null;
 }
 
 export const AdminOrdersTable = ({
   orders,
   onStatusChange,
+  updatingOrderId,
 }: AdminOrdersTableProps) => {
   return (
     <div className="overflow-x-auto">
@@ -49,9 +51,10 @@ export const AdminOrdersTable = ({
               <TableCell>${order.total.toFixed(2)}</TableCell>
               <TableCell>
                 <OrderStatusSelect
-                  status={order.status as OrderStatus}
+                  status={order.status}
                   onStatusChange={onStatusChange}
                   orderId={order.id}
+                  isUpdating={updatingOrderId === order.id}
                 />
               </TableCell>
               <TableCell>

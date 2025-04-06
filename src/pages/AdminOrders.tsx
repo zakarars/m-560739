@@ -22,39 +22,42 @@ const AdminOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [updating, setUpdating] = useState<string | null>(null);
 
   // Check if user is an admin
   const isAdmin = user && ADMIN_EMAILS.includes(user.email || "");
 
-  useEffect(() => {
-    async function fetchAllOrders() {
-      if (!user || !isAdmin) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        console.log("Fetching all orders for admin...");
-        const { data, error: fetchError } = await supabase
-          .from("orders")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (fetchError) throw fetchError;
-
-        console.log("Fetched orders data:", data);
-        const typedOrders = data ? data.map((order) => fromDbOrder(order)) : [];
-        console.log("Processed orders:", typedOrders);
-
-        setOrders(typedOrders);
-      } catch (err) {
-        console.error("Error fetching orders:", err);
-        setError("Failed to load orders");
-      } finally {
-        setIsLoading(false);
-      }
+  // Fetch all orders
+  const fetchAllOrders = async () => {
+    if (!user || !isAdmin) {
+      setIsLoading(false);
+      return;
     }
 
+    try {
+      console.log("Fetching all orders for admin...");
+      const { data, error: fetchError } = await supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (fetchError) throw fetchError;
+
+      console.log("Fetched orders data:", data);
+      const typedOrders = data ? data.map((order) => fromDbOrder(order)) : [];
+      console.log("Processed orders:", typedOrders);
+
+      setOrders(typedOrders);
+    } catch (err) {
+      console.error("Error fetching orders:", err);
+      setError("Failed to load orders");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Initial data fetch
+  useEffect(() => {
     fetchAllOrders();
   }, [user, isAdmin]);
 
@@ -78,11 +81,11 @@ const AdminOrders = () => {
           
           // Update the local state when an order is updated
           setOrders(currentOrders => {
+            const updatedOrder = fromDbOrder(payload.new);
             const updatedOrders = currentOrders.map(order => 
-              order.id === payload.new.id 
-                ? fromDbOrder(payload.new) 
-                : order
+              order.id === updatedOrder.id ? updatedOrder : order
             );
+            
             console.log("Updated orders state:", updatedOrders);
             return updatedOrders;
           });
@@ -101,76 +104,77 @@ const AdminOrders = () => {
     };
   }, [user, isAdmin]);
 
+  // Completely rebuilt status update function
   const handleStatusChange = async (
     orderId: string,
     newStatus: OrderStatus
   ): Promise<void> => {
     try {
-      console.log("Updating order status:", orderId, "to", newStatus);
-      console.log("Order ID type:", typeof orderId);
+      // Set updating state to show loading UI
+      setUpdating(orderId);
+      console.log(`Updating order ${orderId} to status: ${newStatus}`);
       
-      // First verify the order exists and is accessible
-      const { data: checkOrder, error: checkError } = await supabase
+      // Step 1: Verify the order exists before attempting to update
+      const { data: existingOrder, error: checkError } = await supabase
         .from("orders")
         .select("id, status")
         .eq("id", orderId)
-        .single();
+        .maybeSingle();
       
       if (checkError) {
-        console.error("Error checking order:", checkError);
-        toast.error("Failed to find order to update");
+        console.error("Error checking order existence:", checkError);
+        toast.error(`Error verifying order: ${checkError.message}`);
         return;
       }
       
-      console.log("Found order to update:", checkOrder);
+      if (!existingOrder) {
+        console.error("Order not found:", orderId);
+        toast.error("Cannot update: Order not found in database");
+        return;
+      }
       
-      // Ensure timestamp is up-to-date
-      const timestamp = new Date().toISOString();
+      console.log("Found order to update:", existingOrder);
       
-      // Update the order status in the database
-      const { data, error } = await supabase
+      // Step 2: Perform the update operation
+      const { data, error: updateError } = await supabase
         .from("orders")
         .update({ 
           status: newStatus, 
-          updated_at: timestamp 
+          updated_at: new Date().toISOString() 
         })
         .eq("id", orderId)
         .select();
-
-      if (error) {
-        console.error("Database error updating order status:", error);
-        toast.error("Failed to update order status: " + error.message);
-        throw error;
-      }
-
-      console.log("Database update response:", data);
       
-      // Verify if any records were updated
-      if (!data || data.length === 0) {
-        console.error("No records were updated in the database");
-        toast.error("Failed to update order status - no records affected");
+      if (updateError) {
+        console.error("Database error updating order status:", updateError);
+        toast.error(`Update failed: ${updateError.message}`);
         return;
       }
-
-      // Update the local state to reflect the change immediately
-      setOrders(
-        orders.map((order) =>
-          order.id === orderId
-            ? {
-                ...order,
-                status: newStatus,
-                updated_at: timestamp,
-              }
-            : order
+      
+      if (!data || data.length === 0) {
+        console.error("No records were updated for ID:", orderId);
+        toast.error("Update failed: No records affected");
+        return;
+      }
+      
+      console.log("Update successful, response:", data);
+      
+      // Local state update is handled by the realtime subscription,
+      // but we'll update it here too for immediate feedback
+      const updatedOrder = fromDbOrder(data[0]);
+      setOrders(currentOrders =>
+        currentOrders.map(order =>
+          order.id === orderId ? updatedOrder : order
         )
       );
-
-      toast.success(`Order status updated to ${newStatus}`);
-      // We explicitly don't return the data here to match the Promise<void> return type
-    } catch (error) {
-      console.error("Error updating order status:", error);
-      toast.error("Failed to update order status");
-      throw error;
+      
+      toast.success(`Order #${orderId.substring(0, 8)} updated to ${newStatus}`);
+    } catch (error: any) {
+      console.error("Unexpected error during update:", error);
+      toast.error(`Update failed: ${error?.message || "Unknown error"}`);
+    } finally {
+      // Always clear the updating state
+      setUpdating(null);
     }
   };
 
@@ -214,7 +218,11 @@ const AdminOrders = () => {
 
             <Separator />
 
-            <AdminOrdersTable orders={orders} onStatusChange={handleStatusChange} />
+            <AdminOrdersTable 
+              orders={orders} 
+              onStatusChange={handleStatusChange} 
+              updatingOrderId={updating}
+            />
           </div>
         )}
       </div>

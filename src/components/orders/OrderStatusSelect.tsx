@@ -8,62 +8,52 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { statusIcons, statusLabels } from "./OrderStatusIcons";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Save } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 interface OrderStatusSelectProps {
   status: OrderStatus;
   onStatusChange: (orderId: string, status: OrderStatus) => Promise<void>;
   orderId: string;
+  isUpdating: boolean;
 }
 
 export const OrderStatusSelect = ({
   status,
   onStatusChange,
   orderId,
+  isUpdating,
 }: OrderStatusSelectProps) => {
-  const [currentStatus, setCurrentStatus] = useState<OrderStatus>(status);
-  const [pendingStatus, setPendingStatus] = useState<OrderStatus | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
-
-  const handleStatusChange = (newStatus: string) => {
-    // Just set the pending status but don't save yet
-    setPendingStatus(newStatus as OrderStatus);
-  };
-
-  const handleSaveStatus = async () => {
-    if (!pendingStatus || pendingStatus === currentStatus) return;
+  const handleChange = async (newStatus: string) => {
+    if (newStatus === status) return;
     
     try {
-      setIsUpdating(true);
-      console.log(`Saving order status for order ${orderId}: ${pendingStatus}`);
-      await onStatusChange(orderId, pendingStatus as OrderStatus);
-      
-      // Only update the current status after successful save
-      setCurrentStatus(pendingStatus);
-      setPendingStatus(null);
+      await onStatusChange(orderId, newStatus as OrderStatus);
     } catch (error) {
-      console.error("Error updating status:", error);
-      // Reset pending status on error
-      setPendingStatus(null);
-    } finally {
-      setIsUpdating(false);
+      console.error("Error in status change handler:", error);
+      // Error is handled in the parent component
     }
   };
 
-  // Determine which status to display in the select
-  const displayStatus = pendingStatus || currentStatus;
-
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 relative">
       <Select
-        value={displayStatus}
-        onValueChange={handleStatusChange}
+        value={status}
+        onValueChange={handleChange}
         disabled={isUpdating}
       >
-        <SelectTrigger className={`w-[130px] ${isUpdating ? 'opacity-70' : ''}`}>
-          <SelectValue placeholder="Status" />
+        <SelectTrigger className="w-[140px]">
+          <SelectValue placeholder="Status">
+            <div className="flex items-center gap-2">
+              {isUpdating ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : (
+                statusIcons[status]
+              )}
+              <span className={isUpdating ? "text-muted-foreground" : ""}>
+                {statusLabels[status]}
+              </span>
+            </div>
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="pending">
@@ -92,18 +82,6 @@ export const OrderStatusSelect = ({
           </SelectItem>
         </SelectContent>
       </Select>
-      
-      {pendingStatus && pendingStatus !== currentStatus && (
-        <Button 
-          size="sm" 
-          onClick={handleSaveStatus} 
-          disabled={isUpdating}
-          className="ml-1"
-        >
-          <Save className="h-4 w-4 mr-1" />
-          Save
-        </Button>
-      )}
     </div>
   );
 };
