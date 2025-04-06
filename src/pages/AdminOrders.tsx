@@ -108,30 +108,42 @@ const AdminOrders = () => {
     try {
       console.log("Updating order status:", orderId, "to", newStatus);
       
+      // Ensure timestamp is up-to-date
+      const timestamp = new Date().toISOString();
+      
+      // Update the order status in the database
       const { data, error } = await supabase
         .from("orders")
         .update({ 
           status: newStatus, 
-          updated_at: new Date().toISOString() 
+          updated_at: timestamp 
         })
         .eq("id", orderId)
         .select();
 
       if (error) {
-        console.error("Error updating order status:", error);
+        console.error("Database error updating order status:", error);
+        toast.error("Failed to update order status: " + error.message);
         throw error;
       }
 
-      console.log("Update response:", data);
+      console.log("Database update response:", data);
+      
+      // Verify if any records were updated
+      if (!data || data.length === 0) {
+        console.error("No records were updated in the database");
+        toast.error("Failed to update order status - no records affected");
+        return;
+      }
 
-      // Update the local state to reflect the change
+      // Update the local state to reflect the change immediately
       setOrders(
         orders.map((order) =>
           order.id === orderId
             ? {
                 ...order,
                 status: newStatus,
-                updated_at: new Date().toISOString(),
+                updated_at: timestamp,
               }
             : order
         )
