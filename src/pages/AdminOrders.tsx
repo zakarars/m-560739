@@ -50,6 +50,18 @@ import { toast } from "sonner";
 // In a real app, you would have a proper role-based system
 const ADMIN_EMAILS = ["arsen.zakaryan@gmail.com"];
 
+// Helper function to check if user is admin
+const checkIsAdmin = (user: any) => {
+  if (!user) return false;
+  
+  // Check email list
+  if (user.email && ADMIN_EMAILS.includes(user.email)) return true;
+  
+  // Check user metadata for role
+  const userRole = user.user_metadata?.role;
+  return userRole === 'admin';
+};
+
 // Order status components
 const statusIcons = {
   pending: <Clock className="h-4 w-4 text-yellow-500" />,
@@ -74,25 +86,38 @@ const AdminOrders = () => {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   // Check if user is an admin
-  const isAdmin = user && ADMIN_EMAILS.includes(user.email || "");
+  const isAdmin = checkIsAdmin(user);
+  
+  // Debug logging
+  console.log("Auth state:", { 
+    user, 
+    userEmail: user?.email, 
+    userRole: user?.user_metadata?.role,
+    isAdmin 
+  });
 
   useEffect(() => {
     async function fetchAllOrders() {
       if (!user || !isAdmin) {
+        console.log("User not authorized:", { user, isAdmin });
         setIsLoading(false);
         return;
       }
 
       try {
+        console.log("Fetching orders...");
         const { data, error: fetchError } = await supabase
           .from("orders")
           .select("*")
           .order("created_at", { ascending: false });
 
-        if (fetchError) throw fetchError;
+        if (fetchError) {
+          console.error("Supabase fetch error:", fetchError);
+          throw fetchError;
+        }
 
+        console.log("Orders fetched:", data);
         const typedOrders = data ? data.map((order) => fromDbOrder(order)) : [];
-
         setOrders(typedOrders);
       } catch (err) {
         console.error("Error fetching orders:", err);

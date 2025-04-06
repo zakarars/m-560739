@@ -19,6 +19,7 @@ import {
   Truck,
   PackageCheck,
   ArrowRight,
+  AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,22 +45,31 @@ const Orders = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Debug logging
+  console.log("Orders page - Auth state:", { user, userEmail: user?.email });
+
   useEffect(() => {
     async function fetchOrders() {
       if (!user) {
+        console.log("No user found, skipping fetch");
         setIsLoading(false);
         return;
       }
 
       try {
+        console.log("Fetching orders for user:", user.id);
         const { data, error: fetchError } = await supabase
           .from("orders")
           .select("*")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
         
-        if (fetchError) throw fetchError;
+        if (fetchError) {
+          console.error("Supabase fetch error:", fetchError);
+          throw fetchError;
+        }
 
+        console.log("Orders fetched:", data);
         const typedOrders = data ? data.map(order => fromDbOrder(order)) : [];
         
         setOrders(typedOrders);
@@ -106,10 +116,19 @@ const Orders = () => {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-16 text-center">
+          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />
           <h1 className="text-2xl font-bold text-destructive mb-4">{error}</h1>
-          <Button asChild>
-            <Link to="/shop">Continue Shopping</Link>
-          </Button>
+          <p className="text-muted-foreground mb-6">
+            We encountered an error while loading your orders. Please try again later.
+          </p>
+          <div className="flex gap-4 justify-center">
+            <Button onClick={() => window.location.reload()}>
+              Try Again
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/shop">Continue Shopping</Link>
+            </Button>
+          </div>
         </div>
       </Layout>
     );
