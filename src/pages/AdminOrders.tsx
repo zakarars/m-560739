@@ -107,6 +107,22 @@ const AdminOrders = () => {
   ): Promise<void> => {
     try {
       console.log("Updating order status:", orderId, "to", newStatus);
+      console.log("Order ID type:", typeof orderId);
+      
+      // First verify the order exists and is accessible
+      const { data: checkOrder, error: checkError } = await supabase
+        .from("orders")
+        .select("id, status")
+        .eq("id", orderId)
+        .single();
+      
+      if (checkError) {
+        console.error("Error checking order:", checkError);
+        toast.error("Failed to find order to update");
+        return;
+      }
+      
+      console.log("Found order to update:", checkOrder);
       
       // Ensure timestamp is up-to-date
       const timestamp = new Date().toISOString();
