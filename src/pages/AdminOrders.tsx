@@ -32,39 +32,56 @@ const AdminOrders = () => {
 
   // Function to fetch orders with filtering
   const fetchOrders = async () => {
-    let query = supabase
-      .from("orders")
-      .select(`
-        *,
-        user:user_id (email, full_name),
-        order_items (
-          id,
-          quantity,
-          price,
-          product:product_id (name, imageurl)
-        )
-      `)
-      .order("created_at", { ascending: false });
+    try {
+      console.log("Fetching orders with filters:", { statusFilter, searchQuery });
+      
+      let query = supabase
+        .from("orders")
+        .select(`
+          *,
+          user:profiles!orders_user_id_fkey (id, first_name, last_name),
+          order_items (
+            id,
+            quantity,
+            price,
+            product:product_id (name, imageurl)
+          )
+        `)
+        .order("created_at", { ascending: false });
 
-    // Apply status filter if not "all"
-    if (statusFilter !== "all") {
-      query = query.eq("status", statusFilter);
+      // Apply status filter if not "all"
+      if (statusFilter !== "all") {
+        query = query.eq("status", statusFilter);
+      }
+
+      // Apply search query if present (searching by order ID or user first/last name)
+      if (searchQuery) {
+        query = query.or(`id.ilike.%${searchQuery}%,user.first_name.ilike.%${searchQuery}%,user.last_name.ilike.%${searchQuery}%`);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("Error fetching orders:", error);
+        throw new Error(error.message);
+      }
+
+      console.log("Raw orders data:", data);
+      
+      // Convert the DB orders to our application Order type
+      // Handle the case when data might be null or empty
+      return (data || []).map(orderData => {
+        try {
+          return fromDbOrder(orderData);
+        } catch (error) {
+          console.error("Error converting order data:", error, orderData);
+          return null;
+        }
+      }).filter(Boolean) as Order[];
+    } catch (error) {
+      console.error("Failed in fetchOrders:", error);
+      throw error;
     }
-
-    // Apply search query if present (searching by order ID or user email)
-    if (searchQuery) {
-      query = query.or(`id.ilike.%${searchQuery}%,user.email.ilike.%${searchQuery}%`);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error("Error fetching orders:", error);
-      throw new Error(error.message);
-    }
-
-    // Convert the DB orders to our application Order type
-    return (data || []).map(order => fromDbOrder(order));
   };
 
   const {
@@ -153,7 +170,7 @@ const AdminOrders = () => {
           
           <form onSubmit={handleSearch} className="flex gap-2">
             <Input
-              placeholder="Search by order ID or email"
+              placeholder="Search by order ID or name"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="max-w-[240px]"
@@ -178,6 +195,7 @@ const AdminOrders = () => {
               <AdminOrdersTable 
                 orders={paginatedOrders} 
                 onStatusChange={handleStatusChange}
+                updatingOrderId={updatingOrderId}
               />
             ) : (
               <div className="text-center py-12 border rounded-md bg-background">
