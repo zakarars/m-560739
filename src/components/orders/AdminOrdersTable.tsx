@@ -1,7 +1,6 @@
-import { format } from "date-fns";
-import { Eye } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Order, OrderStatus } from "@/types/orders";
+
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Table,
   TableBody,
@@ -10,89 +9,126 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { OrderStatusSelect } from "./OrderStatusSelect";
-import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Order, OrderStatus, statusIcons, statusLabels } from "@/types/orders";
+import { formatDistanceToNow } from "date-fns";
+import { Eye } from "lucide-react";
 
 interface AdminOrdersTableProps {
   orders: Order[];
-  onStatusChange: (orderId: string, status: OrderStatus) => Promise<void>;
-  updatingOrderId: string | null;
+  onStatusChange?: (orderId: string, newStatus: OrderStatus) => Promise<void>;
 }
 
-export const AdminOrdersTable = ({
+export function AdminOrdersTable({
   orders,
   onStatusChange,
-  updatingOrderId,
-}: AdminOrdersTableProps) => {
-  const handleStatusChange = async (orderId: string, status: OrderStatus) => {
-    console.log(`AdminOrdersTable: Requesting status change for order ${orderId} to ${status}`);
+}: AdminOrdersTableProps) {
+  const navigate = useNavigate();
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+    if (!onStatusChange) return;
+    
+    setUpdatingOrderId(orderId);
     try {
-      await onStatusChange(orderId, status);
-    } catch (error) {
-      console.error("AdminOrdersTable: Error in status change:", error);
-      // Error handling is done in parent component
+      await onStatusChange(orderId, newStatus);
+    } finally {
+      setUpdatingOrderId(null);
     }
   };
 
+  const getNextStatus = (currentStatus: OrderStatus): OrderStatus => {
+    const statusFlow: OrderStatus[] = ["pending", "processing", "shipped", "delivered"];
+    const currentIndex = statusFlow.indexOf(currentStatus);
+    
+    if (currentIndex === -1 || currentIndex === statusFlow.length - 1) {
+      return currentStatus;
+    }
+    
+    return statusFlow[currentIndex + 1];
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount);
+  };
+
   return (
-    <div className="overflow-x-auto">
+    <div className="rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Order #</TableHead>
+            <TableHead>Order ID</TableHead>
             <TableHead>Date</TableHead>
-            <TableHead>Customer</TableHead>
-            <TableHead>Total</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Actions</TableHead>
+            <TableHead>Customer</TableHead>
+            <TableHead className="text-right">Total</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {orders.length === 0 ? (
+          {orders.length === 0 && (
             <TableRow>
               <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                 No orders found
               </TableCell>
             </TableRow>
-          ) : (
-            orders.map((order) => (
+          )}
+          
+          {orders.map((order) => {
+            const nextStatus = getNextStatus(order.status as OrderStatus);
+            const canProgress = nextStatus !== order.status;
+            
+            return (
               <TableRow key={order.id}>
                 <TableCell className="font-medium">
-                  {order.id.substring(0, 8)}
+                  {order.id.substring(0, 8)}...
                 </TableCell>
                 <TableCell>
-                  {format(new Date(order.created_at), "MMM d, yyyy")}
-                </TableCell>
-                <TableCell>{order.shipping_address.fullName}</TableCell>
-                <TableCell>${order.total.toFixed(2)}</TableCell>
-                <TableCell>
-                  <OrderStatusSelect
-                    status={order.status}
-                    onStatusChange={handleStatusChange}
-                    orderId={order.id}
-                    isUpdating={updatingOrderId === order.id}
-                  />
+                  {formatDistanceToNow(new Date(order.created_at), { addSuffix: true })}
                 </TableCell>
                 <TableCell>
-                  <Button
-                    asChild
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center"
-                  >
-                    <Link
-                      to={`/admin/orders/${order.id}`}
+                  <Badge variant={order.status === "delivered" ? "default" : "outline"}>
+                    <span className="mr-1">
+                      {statusIcons[order.status as OrderStatus]}
+                    </span>
+                    {statusLabels[order.status as OrderStatus]}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  {order.shipping_address.fullName}
+                </TableCell>
+                <TableCell className="text-right">
+                  {formatCurrency(order.total)}
+                </TableCell>
+                <TableCell className="text-right space-x-2">
+                  {onStatusChange && canProgress && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleStatusChange(order.id, nextStatus)}
+                      disabled={updatingOrderId === order.id}
                     >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View
-                    </Link>
+                      Mark as {statusLabels[nextStatus]}
+                    </Button>
+                  )}
+                  
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => navigate(`/admin/orders/${order.id}`)}
+                  >
+                    <Eye className="h-4 w-4" />
                   </Button>
                 </TableCell>
               </TableRow>
-            ))
-          )}
+            );
+          })}
         </TableBody>
       </Table>
     </div>
   );
-};
+}

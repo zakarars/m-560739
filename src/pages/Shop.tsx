@@ -1,123 +1,91 @@
-import { useEffect, useState } from "react";
+
+import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import ProductCard from "@/components/ProductCard";
+import CategoryFilter from "@/components/CategoryFilter";
 import { supabase } from "@/integrations/supabase/client";
-import { Product } from "@/types/products";
+import { useQuery } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
+import { apiToInternalProduct } from "@/utils/productUtils";
 
-function LoadingState() {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {[...Array(8)].map((_, i) => (
-        <div key={i} className="h-[300px] bg-muted animate-pulse rounded-lg" />
-      ))}
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="text-center py-12">
-      <h2 className="text-2xl font-semibold mb-2">No products found</h2>
-      <p className="text-muted-foreground">
-        Try adjusting your search or filter criteria
-      </p>
-    </div>
-  );
-}
-
-function ProductGrid({ products }: { products: Product[] }) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {products.map((product) => (
-        <ProductCard key={product.id} product={product} />
-      ))}
-    </div>
-  );
-}
-
-export default function Shop() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  async function fetchProducts() {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      setProducts(data || []);
-      
-      // Extract unique categories
-      const uniqueCategories = Array.from(
-        new Set(data?.map((product) => product.category) || [])
-      ).filter(Boolean).sort();
-      
-      setCategories(uniqueCategories);
-    } catch (error) {
-      console.error("Error fetching products:", error);
-    } finally {
-      setIsLoading(false);
-    }
+const fetchProducts = async (category?: string) => {
+  let query = supabase.from("products").select("*");
+  
+  if (category && category !== "all") {
+    query = query.eq("category", category);
   }
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    throw new Error(error.message);
+  }
+  
+  return data || [];
+};
 
-  const filteredProducts = products.filter((product) => {
-    const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         product.description.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+const Shop = () => {
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  
+  const { data: products, isLoading, error } = useQuery({
+    queryKey: ["products", selectedCategory],
+    queryFn: () => fetchProducts(selectedCategory),
   });
-
-  const renderContent = () => {
-    if (isLoading) return <LoadingState />;
-    if (filteredProducts.length === 0) return <EmptyState />;
-    return <ProductGrid products={filteredProducts} />;
-  };
-
+  
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-16 flex items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+  
+  if (error) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-16 text-center">
+          <h2 className="text-2xl font-bold text-destructive">
+            Error loading products
+          </h2>
+          <p className="text-muted-foreground mt-2">
+            {error instanceof Error ? error.message : "Unknown error occurred"}
+          </p>
+        </div>
+      </Layout>
+    );
+  }
+  
+  // Convert API products to internal product format using our utility function
+  const convertedProducts = products?.map(apiToInternalProduct) || [];
+  
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
-          <Input
-            placeholder="Search products..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="md:max-w-xs"
-          />
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="md:max-w-xs">
-              <SelectValue placeholder="Select category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <h1 className="text-3xl font-bold mb-8">Shop Our Products</h1>
+        
+        <CategoryFilter 
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
+        />
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-8">
+          {convertedProducts.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+          
+          {convertedProducts.length === 0 && (
+            <div className="col-span-full text-center py-12">
+              <p className="text-xl text-muted-foreground">
+                No products found in this category.
+              </p>
+            </div>
+          )}
         </div>
-        {renderContent()}
       </div>
     </Layout>
   );
-}
+};
+
+export default Shop;

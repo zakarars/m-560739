@@ -1,87 +1,94 @@
 
-import { OrderStatus } from "@/types/orders";
+import { useState } from "react";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { statusIcons, statusLabels } from "./OrderStatusIcons";
-import { Loader2 } from "lucide-react";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { OrderStatus, statusIcons, statusLabels } from "@/types/orders";
 
-interface OrderStatusSelectProps {
-  status: OrderStatus;
-  onStatusChange: (orderId: string, status: OrderStatus) => Promise<void>;
-  orderId: string;
-  isUpdating: boolean;
+export interface OrderStatusSelectProps {
+  currentStatus: OrderStatus;
+  onStatusChange: (newStatus: OrderStatus) => Promise<void>;
+  isDisabled?: boolean;
 }
 
-export const OrderStatusSelect = ({
-  status,
-  onStatusChange,
-  orderId,
-  isUpdating,
-}: OrderStatusSelectProps) => {
-  const handleChange = async (newStatus: string) => {
-    if (newStatus === status) return;
-    
+export function OrderStatusSelect({ 
+  currentStatus, 
+  onStatusChange, 
+  isDisabled = false 
+}: OrderStatusSelectProps) {
+  const [open, setOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleStatusChange = async (status: OrderStatus) => {
+    if (status === currentStatus) {
+      setOpen(false);
+      return;
+    }
+
+    setIsUpdating(true);
     try {
-      await onStatusChange(orderId, newStatus as OrderStatus);
-    } catch (error) {
-      console.error("Error in status change handler:", error);
-      // Error is handled in the parent component
+      await onStatusChange(status);
+    } finally {
+      setIsUpdating(false);
+      setOpen(false);
     }
   };
 
+  const statuses: OrderStatus[] = ["pending", "processing", "shipped", "delivered"];
+
   return (
-    <div className="flex items-center gap-2 relative">
-      <Select
-        value={status}
-        onValueChange={handleChange}
-        disabled={isUpdating}
-      >
-        <SelectTrigger className="w-[140px]">
-          <SelectValue placeholder="Status">
-            <div className="flex items-center gap-2">
-              {isUpdating ? (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              ) : (
-                statusIcons[status]
-              )}
-              <span className={isUpdating ? "text-muted-foreground" : ""}>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-[200px] justify-between"
+          disabled={isDisabled || isUpdating}
+        >
+          <span className="flex items-center">
+            <span className="mr-2">{statusIcons[currentStatus]}</span>
+            {statusLabels[currentStatus]}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0">
+        <Command>
+          <CommandInput placeholder="Search status..." />
+          <CommandEmpty>No status found.</CommandEmpty>
+          <CommandGroup>
+            {statuses.map((status) => (
+              <CommandItem
+                key={status}
+                value={status}
+                onSelect={() => handleStatusChange(status)}
+              >
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    currentStatus === status ? "opacity-100" : "opacity-0"
+                  )}
+                />
+                <span className="mr-2">{statusIcons[status]}</span>
                 {statusLabels[status]}
-              </span>
-            </div>
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="pending">
-            <div className="flex items-center gap-2">
-              {statusIcons.pending}
-              {statusLabels.pending}
-            </div>
-          </SelectItem>
-          <SelectItem value="processing">
-            <div className="flex items-center gap-2">
-              {statusIcons.processing}
-              {statusLabels.processing}
-            </div>
-          </SelectItem>
-          <SelectItem value="shipped">
-            <div className="flex items-center gap-2">
-              {statusIcons.shipped}
-              {statusLabels.shipped}
-            </div>
-          </SelectItem>
-          <SelectItem value="delivered">
-            <div className="flex items-center gap-2">
-              {statusIcons.delivered}
-              {statusLabels.delivered}
-            </div>
-          </SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
-};
+}

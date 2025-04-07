@@ -1,3 +1,4 @@
+
 import { PostgrestError } from "@supabase/supabase-js";
 
 export interface ShippingAddress {
@@ -14,7 +15,7 @@ export type OrderStatus = "pending" | "processing" | "shipped" | "delivered";
 export interface Order {
   id: string;
   user_id: string;
-  status: string;
+  status: OrderStatus;
   total: number;
   shipping_cost: number;
   shipping_address: ShippingAddress;
@@ -62,7 +63,7 @@ export const fromDbOrder = (dbOrder: any): Order => {
   return {
     id: dbOrder.id,
     user_id: dbOrder.user_id,
-    status: dbOrder.status || 'pending',
+    status: (dbOrder.status || 'pending') as OrderStatus,
     total: dbOrder.total,
     shipping_cost: dbOrder.shipping_cost || 0,
     shipping_address: shippingAddress,
@@ -71,6 +72,17 @@ export const fromDbOrder = (dbOrder: any): Order => {
     payment_received: dbOrder.payment_received || false,
     stripe_payment_intent_id: dbOrder.stripe_payment_intent_id
   };
+};
+
+// Add the calculateShippingCost function that was missing
+export const calculateShippingCost = (address: ShippingAddress): number => {
+  // Simple shipping cost calculation based on city
+  if (address.city.toLowerCase() === 'yerevan') {
+    return 5.00; // $5 delivery fee for Yerevan
+  }
+  
+  // Free shipping for other locations (this could be expanded with more complex logic)
+  return 0;
 };
 
 // Utility function to help filter/query orders
