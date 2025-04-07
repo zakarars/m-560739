@@ -1,4 +1,3 @@
-
 import { format } from "date-fns";
 import { Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -82,9 +81,7 @@ export const AdminOrdersTable = ({
                     className="flex items-center"
                   >
                     <Link
-                      to={`/order-confirmation/${order.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      to={`/admin/orders/${order.id}`}
                     >
                       <Eye className="h-4 w-4 mr-1" />
                       View

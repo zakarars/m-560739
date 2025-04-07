@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -32,7 +31,11 @@ const Orders = () => {
   const [error, setError] = useState('');
 
   // Debug logging
-  console.log("Orders page - Auth state:", { user, userEmail: user?.email });
+  console.log("Orders page - Auth state:", { 
+    user, 
+    userEmail: user?.email,
+    userId: user?.id
+  });
 
   useEffect(() => {
     async function fetchOrders() {
@@ -43,7 +46,20 @@ const Orders = () => {
       }
 
       try {
-        console.log("Fetching orders for user:", user.id);
+        // Get the current session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("Session error:", sessionError);
+          throw new Error("Authentication error");
+        }
+
+        if (!session) {
+          console.error("No active session");
+          throw new Error("No active session");
+        }
+
+        console.log("Fetching orders with auth...");
         const { data, error: fetchError } = await supabase
           .from("orders")
           .select("*")
@@ -51,18 +67,47 @@ const Orders = () => {
           .order("created_at", { ascending: false });
         
         if (fetchError) {
-          console.error("Supabase fetch error:", fetchError);
-          throw fetchError;
+          console.error("Supabase fetch error details:", {
+            error: fetchError,
+            message: fetchError.message,
+            details: fetchError.details,
+            hint: fetchError.hint,
+            code: fetchError.code
+          });
+          throw new Error(fetchError.message || "Failed to fetch orders");
         }
 
-        console.log("Orders fetched:", data);
-        const typedOrders = data ? data.map(order => fromDbOrder(order)) : [];
-        console.log("Fetched orders:", typedOrders);
+        if (!data) {
+          console.log("No data returned from Supabase");
+          setOrders([]);
+          return;
+        }
+
+        console.log("Orders fetched successfully:", {
+          count: data.length,
+          orders: data
+        });
+        
+        const typedOrders = data.map(order => {
+          try {
+            return fromDbOrder(order);
+          } catch (err) {
+            console.error("Error transforming order:", {
+              error: err,
+              order: order
+            });
+            throw new Error("Failed to process order data");
+          }
+        });
         
         setOrders(typedOrders);
       } catch (err) {
-        console.error("Error fetching orders:", err);
-        setError('Failed to load orders');
+        console.error("Error in orders flow:", {
+          error: err,
+          message: err instanceof Error ? err.message : 'Unknown error',
+          user: user.id
+        });
+        setError(err instanceof Error ? err.message : 'Failed to load orders');
       } finally {
         setIsLoading(false);
       }
