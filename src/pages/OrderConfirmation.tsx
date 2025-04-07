@@ -80,11 +80,11 @@ const OrderConfirmation = () => {
                   const interval = setInterval(async () => {
                     const { data } = await supabase
                       .from("orders")
-                      .select("payment_received")
+                      .select("*")
                       .eq("id", orderId)
                       .single();
                     
-                    if (data?.payment_received) {
+                    if (data && data.payment_received) {
                       setPaymentStatus("success");
                       clearInterval(interval);
                     }

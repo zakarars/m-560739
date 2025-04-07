@@ -19,15 +19,15 @@ import Orders from "./pages/Orders";
 import Admin from "./pages/Admin";
 import AdminOrders from "./pages/AdminOrders";
 import AdminProducts from "./pages/AdminProducts";
+import AdminUsers from "./pages/AdminUsers";
+import AdminUserDetail from "./pages/AdminUserDetail";
+import AdminUserEdit from "./pages/AdminUserEdit";
+import AdminOrderDetail from "./pages/AdminOrderDetail";
+import AdminAnalytics from "./pages/AdminAnalytics";
 import OurStory from "./pages/OurStory";
 import Auth from "./pages/Auth";
 import AuthError from "./pages/AuthError";
 import NotFound from "./pages/NotFound";
-import AdminUsers from "@/pages/AdminUsers";
-import AdminUserDetail from "@/pages/AdminUserDetail";
-import AdminUserEdit from "@/pages/AdminUserEdit";
-import AdminOrderDetail from "@/pages/AdminOrderDetail";
-import AdminAnalytics from "@/pages/AdminAnalytics";
 
 // Stripe publishable key - this is safe to expose in the frontend code
 const stripePromise = loadStripe("pk_test_REPLACE_WITH_YOUR_KEY");

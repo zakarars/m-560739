@@ -1,19 +1,28 @@
-import { Json } from '@/integrations/supabase/types';
+import { PostgrestError } from "@supabase/supabase-js";
 
 export interface ShippingAddress {
   fullName: string;
-  address?: string;
-  street?: string;
+  address: string;
   city: string;
   state: string;
-  zip?: string;
-  zipCode?: string;
+  zipCode: string;
   country: string;
-  email?: string;
-  phone?: string;
 }
 
-export type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered';
+export type OrderStatus = "pending" | "processing" | "shipped" | "delivered";
+
+export interface Order {
+  id: string;
+  user_id: string;
+  status: string;
+  total: number;
+  shipping_cost: number;
+  shipping_address: ShippingAddress;
+  created_at: string;
+  updated_at: string;
+  payment_received: boolean;
+  stripe_payment_intent_id?: string;
+}
 
 export interface OrderItem {
   id: string;
@@ -21,97 +30,120 @@ export interface OrderItem {
   product_id: string;
   quantity: number;
   price: number;
-  created_at: string;
-  updated_at: string;
-  product?: any; // Optional product details if joined
+  product: any;
 }
 
-export interface Order {
-  id: string;
-  user_id: string;
-  total: number;
-  shipping_cost: number;
-  tax: number;
-  status: OrderStatus;
-  shipping_address: ShippingAddress;
-  created_at: string;
-  updated_at: string;
-  items?: OrderItem[]; // Optional items if joined
-}
-
-// Helper function to convert from DB order to our order type
-export function fromDbOrder(dbOrder: any): Order {
+export const fromDbOrder = (dbOrder: any): Order => {
+  // Validate required fields
   if (!dbOrder) {
-    throw new Error("Invalid order data: Order is null or undefined");
+    throw new Error("Order data is null or undefined");
   }
-
-  if (!dbOrder.id || !dbOrder.user_id) {
-    throw new Error("Invalid order data: Missing required fields (id or user_id)");
-  }
-
-  // Validate and ensure status is of type OrderStatus
-  if (!dbOrder.status || !["pending", "processing", "shipped", "delivered"].includes(dbOrder.status)) {
-    console.warn(`Invalid order status: ${dbOrder.status}, defaulting to 'pending'`);
-    dbOrder.status = "pending";
-  }
-  const status = dbOrder.status as OrderStatus;
   
-  // Validate and parse shipping_address
-  if (!dbOrder.shipping_address) {
-    console.warn("Order is missing shipping_address, creating a default one");
-    dbOrder.shipping_address = {
-      fullName: "Unknown",
-      address: "Unknown",
-      city: "Unknown",
-      state: "Unknown",
-      zipCode: "Unknown",
-      country: "Unknown"
-    };
+  if (!dbOrder.id || !dbOrder.user_id || !dbOrder.total || !dbOrder.created_at) {
+    console.error("Invalid order data:", dbOrder);
+    throw new Error("Order data is missing required fields");
   }
+  
+  // Parse shipping address from JSON if needed
+  let shippingAddress: ShippingAddress;
+  
+  if (typeof dbOrder.shipping_address === 'string') {
+    try {
+      shippingAddress = JSON.parse(dbOrder.shipping_address);
+    } catch (e) {
+      console.error("Error parsing shipping address:", e);
+      throw new Error("Invalid shipping address format");
+    }
+  } else {
+    shippingAddress = dbOrder.shipping_address as ShippingAddress;
+  }
+  
+  // Return typed order object
+  return {
+    id: dbOrder.id,
+    user_id: dbOrder.user_id,
+    status: dbOrder.status || 'pending',
+    total: dbOrder.total,
+    shipping_cost: dbOrder.shipping_cost || 0,
+    shipping_address: shippingAddress,
+    created_at: dbOrder.created_at,
+    updated_at: dbOrder.updated_at || dbOrder.created_at,
+    payment_received: dbOrder.payment_received || false,
+    stripe_payment_intent_id: dbOrder.stripe_payment_intent_id
+  };
+};
 
+// Utility function to help filter/query orders
+export const queryOrders = async (
+  supabase: any,
+  filters: {
+    userId?: string;
+    status?: OrderStatus;
+    fromDate?: Date;
+    toDate?: Date;
+    limit?: number;
+    offset?: number;
+  }
+) => {
   try {
-    // If shipping_address is a string, try to parse it
-    let shipping_address = typeof dbOrder.shipping_address === 'string' 
-      ? JSON.parse(dbOrder.shipping_address) 
-      : dbOrder.shipping_address;
+    let query = supabase.from("orders").select("*");
     
-    // Make sure all required fields exist, even if they're empty
-    shipping_address = {
-      fullName: shipping_address.fullName || "Unknown",
-      address: shipping_address.address || shipping_address.street || "Unknown",
-      street: shipping_address.street || shipping_address.address || "Unknown",
-      city: shipping_address.city || "Unknown",
-      state: shipping_address.state || "Unknown",
-      zip: shipping_address.zip || shipping_address.zipCode || "Unknown",
-      zipCode: shipping_address.zipCode || shipping_address.zip || "Unknown",
-      country: shipping_address.country || "Unknown",
-      email: shipping_address.email || null,
-      phone: shipping_address.phone || null,
-    };
-  
+    if (filters.userId) {
+      query = query.eq("user_id", filters.userId);
+    }
+    
+    if (filters.status) {
+      query = query.eq("status", filters.status);
+    }
+    
+    if (filters.fromDate) {
+      query = query.gte("created_at", filters.fromDate.toISOString());
+    }
+    
+    if (filters.toDate) {
+      query = query.lte("created_at", filters.toDate.toISOString());
+    }
+    
+    if (filters.limit) {
+      query = query.limit(filters.limit);
+    }
+    
+    if (filters.offset) {
+      query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1);
+    }
+    
+    // Order by created_at (newest first)
+    query = query.order("created_at", { ascending: false });
+    
+    const { data, error, count } = await query;
+    
+    if (error) throw error;
+    
     return {
-      id: dbOrder.id,
-      user_id: dbOrder.user_id,
-      total: Number(dbOrder.total) || 0,
-      shipping_cost: Number(dbOrder.shipping_cost) || 0,
-      tax: Number(dbOrder.tax) || 0,
-      status,
-      shipping_address,
-      created_at: dbOrder.created_at || new Date().toISOString(),
-      updated_at: dbOrder.updated_at || new Date().toISOString(),
-      items: Array.isArray(dbOrder.items) ? dbOrder.items : undefined
+      orders: data ? data.map((order: any) => fromDbOrder(order)) : [],
+      count,
+      error: null,
     };
   } catch (error) {
-    console.error("Error parsing order:", error);
-    throw new Error(`Failed to parse order data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error("Error querying orders:", error);
+    return {
+      orders: [],
+      count: 0,
+      error: error as PostgrestError,
+    };
   }
-}
+};
 
-// Helper function to calculate shipping cost based on location
-export function calculateShippingCost(address: ShippingAddress): number {
-  // Check if the city is Yerevan (case insensitive)
-  if (address.city.toLowerCase() === 'yerevan') {
-    return 5.00; // $5 delivery fee for Yerevan
-  }
-  return 0; // Free shipping for other locations
-}
+export const statusIcons = {
+  pending: "⏳",
+  processing: "⚙️",
+  shipped: "🚚",
+  delivered: "✅",
+};
+
+export const statusLabels = {
+  pending: "Pending",
+  processing: "Processing",
+  shipped: "Shipped",
+  delivered: "Delivered",
+};
