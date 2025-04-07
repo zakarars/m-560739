@@ -9,6 +9,7 @@ import { CartProvider } from "@/context/CartContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // Import critical components directly
 import Layout from "@/components/Layout";
@@ -69,9 +70,6 @@ const queryClient = new QueryClient({
       staleTime: 1000 * 60 * 5, // 5 minutes
       refetchOnWindowFocus: false,
       retry: 1,
-      onError: (error) => {
-        console.error("Query error:", error);
-      }
     },
   },
 });
@@ -86,29 +84,31 @@ const App = () => {
               <Elements stripe={stripePromise}>
                 <Toaster />
                 <Sonner />
-                <Suspense fallback={<PageLoader />}>
-                  <Routes>
-                    <Route path="/" element={<Index />} />
-                    <Route path="/shop" element={<Shop />} />
-                    <Route path="/product/:id" element={<ProductDetail />} />
-                    <Route path="/cart" element={<Cart />} />
-                    <Route path="/checkout" element={<Checkout />} />
-                    <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
-                    <Route path="/orders" element={<Orders />} />
-                    <Route path="/admin" element={<Admin />} />
-                    <Route path="/admin/orders" element={<AdminOrders />} />
-                    <Route path="/admin/orders/:orderId" element={<AdminOrderDetail />} />
-                    <Route path="/admin/products" element={<AdminProducts />} />
-                    <Route path="/admin/users" element={<AdminUsers />} />
-                    <Route path="/admin/users/:userId" element={<AdminUserDetail />} />
-                    <Route path="/admin/users/:userId/edit" element={<AdminUserEdit />} />
-                    <Route path="/admin/analytics" element={<AdminAnalytics />} />
-                    <Route path="/our-story" element={<OurStory />} />
-                    <Route path="/auth" element={<Auth />} />
-                    <Route path="/auth/error" element={<AuthError />} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </Suspense>
+                <ErrorBoundary fallback={<ErrorFallback />}>
+                  <Suspense fallback={<PageLoader />}>
+                    <Routes>
+                      <Route path="/" element={<Index />} />
+                      <Route path="/shop" element={<Shop />} />
+                      <Route path="/product/:id" element={<ProductDetail />} />
+                      <Route path="/cart" element={<Cart />} />
+                      <Route path="/checkout" element={<Checkout />} />
+                      <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
+                      <Route path="/orders" element={<Orders />} />
+                      <Route path="/admin" element={<Admin />} />
+                      <Route path="/admin/orders" element={<AdminOrders />} />
+                      <Route path="/admin/orders/:orderId" element={<AdminOrderDetail />} />
+                      <Route path="/admin/products" element={<AdminProducts />} />
+                      <Route path="/admin/users" element={<AdminUsers />} />
+                      <Route path="/admin/users/:userId" element={<AdminUserDetail />} />
+                      <Route path="/admin/users/:userId/edit" element={<AdminUserEdit />} />
+                      <Route path="/admin/analytics" element={<AdminAnalytics />} />
+                      <Route path="/our-story" element={<OurStory />} />
+                      <Route path="/auth" element={<Auth />} />
+                      <Route path="/auth/error" element={<AuthError />} />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Suspense>
+                </ErrorBoundary>
               </Elements>
             </TooltipProvider>
           </BrowserRouter>

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { calculateShippingCost } from "@/types/orders";
 import { StripePaymentWrapper } from "@/components/payment/StripePaymentWrapper";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const Checkout = () => {
   const navigate = useNavigate();
