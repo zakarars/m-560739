@@ -1,6 +1,7 @@
-
-import React from "react";
-import { OrderStatusSelect } from "@/components/orders/OrderStatusSelect";
+import { format } from "date-fns";
+import { Eye } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Order, OrderStatus } from "@/types/orders";
 import {
   Table,
   TableBody,
@@ -9,65 +10,87 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
+import { OrderStatusSelect } from "./OrderStatusSelect";
 import { Link } from "react-router-dom";
-import { Eye } from "lucide-react";
-import { Order, OrderStatus } from "@/types/orders";
 
-export interface AdminOrdersTableProps {
+interface AdminOrdersTableProps {
   orders: Order[];
-  onStatusChange: (orderId: string, newStatus: OrderStatus) => Promise<void>;
-  updatingOrderId?: string; // Added missing prop
+  onStatusChange: (orderId: string, status: OrderStatus) => Promise<void>;
+  updatingOrderId: string | null;
 }
 
-export const AdminOrdersTable: React.FC<AdminOrdersTableProps> = ({
+export const AdminOrdersTable = ({
   orders,
   onStatusChange,
-  updatingOrderId = "", // Add default value
-}) => {
+  updatingOrderId,
+}: AdminOrdersTableProps) => {
+  const handleStatusChange = async (orderId: string, status: OrderStatus) => {
+    console.log(`AdminOrdersTable: Requesting status change for order ${orderId} to ${status}`);
+    try {
+      await onStatusChange(orderId, status);
+    } catch (error) {
+      console.error("AdminOrdersTable: Error in status change:", error);
+      // Error handling is done in parent component
+    }
+  };
+
   return (
-    <div className="border rounded-md">
+    <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Order ID</TableHead>
+            <TableHead>Order #</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Customer</TableHead>
-            <TableHead>Amount</TableHead>
+            <TableHead>Total</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead className="w-[80px]">Actions</TableHead>
+            <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {orders.map((order) => (
-            <TableRow key={order.id}>
-              <TableCell className="font-medium">{order.id.substring(0, 8)}...</TableCell>
-              <TableCell>
-                {new Date(order.created_at).toLocaleDateString()}
-              </TableCell>
-              <TableCell>
-                {order.shipping_address.fullName}
-              </TableCell>
-              <TableCell>${order.total.toFixed(2)}</TableCell>
-              <TableCell>
-                <OrderStatusSelect
-                  currentStatus={order.status}
-                  onStatusChange={async (newStatus) => {
-                    await onStatusChange(order.id, newStatus);
-                  }}
-                  isDisabled={updatingOrderId === order.id} // Use the prop to disable the select when updating
-                />
-              </TableCell>
-              <TableCell>
-                <Button asChild size="sm" variant="ghost">
-                  <Link to={`/admin/orders/${order.id}`}>
-                    <Eye className="h-4 w-4" />
-                    <span className="sr-only">View order details</span>
-                  </Link>
-                </Button>
+          {orders.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                No orders found
               </TableCell>
             </TableRow>
-          ))}
+          ) : (
+            orders.map((order) => (
+              <TableRow key={order.id}>
+                <TableCell className="font-medium">
+                  {order.id.substring(0, 8)}
+                </TableCell>
+                <TableCell>
+                  {format(new Date(order.created_at), "MMM d, yyyy")}
+                </TableCell>
+                <TableCell>{order.shipping_address.fullName}</TableCell>
+                <TableCell>${order.total.toFixed(2)}</TableCell>
+                <TableCell>
+                  <OrderStatusSelect
+                    status={order.status}
+                    onStatusChange={handleStatusChange}
+                    orderId={order.id}
+                    isUpdating={updatingOrderId === order.id}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className="flex items-center"
+                  >
+                    <Link
+                      to={`/admin/orders/${order.id}`}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
     </div>

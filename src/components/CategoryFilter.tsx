@@ -1,39 +1,26 @@
 
-import React from 'react';
 import { Button } from "@/components/ui/button";
+import { categories } from "@/data/products";
 
-export interface CategoryFilterProps {
-  currentCategory: string;
+interface CategoryFilterProps {
+  activeCategory: string;
   onSelectCategory: (category: string) => void;
 }
 
-const CategoryFilter: React.FC<CategoryFilterProps> = ({ 
-  currentCategory, 
-  onSelectCategory 
-}) => {
-  const categories = [
-    { id: "all", name: "All Products" },
-    { id: "kitchenware", name: "Kitchenware" },
-    { id: "decor", name: "Home Decor" },
-    { id: "bathroom", name: "Bathroom" },
-    { id: "accessories", name: "Accessories" }
-  ];
-  
+export default function CategoryFilter({ activeCategory, onSelectCategory }: CategoryFilterProps) {
   return (
-    <div className="flex flex-wrap gap-2 mb-6">
-      {categories.map((category) => (
+    <div className="flex flex-wrap gap-2 mb-8">
+      {categories.map(category => (
         <Button
           key={category.id}
-          variant={currentCategory === category.id ? "default" : "outline"}
+          variant={activeCategory === category.id ? "default" : "outline"}
           size="sm"
           onClick={() => onSelectCategory(category.id)}
-          className="capitalize"
+          className="rounded-full"
         >
           {category.name}
         </Button>
       ))}
     </div>
   );
-};
-
-export default CategoryFilter;
+}
