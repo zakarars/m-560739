@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Eye, Loader2 } from "lucide-react";
+import { Eye } from "lucide-react";
 import { Order, OrderStatus } from "@/types/orders";
 
 export interface AdminOrdersTableProps {

@@ -48,3 +48,18 @@ export const calculateShippingCost = (address: ShippingAddress): number => {
   // Free shipping for all other locations
   return 0;
 };
+
+// Helper function to convert a database order to our application Order type
+export const fromDbOrder = (dbOrder: any): Order => {
+  return {
+    id: dbOrder.id,
+    user_id: dbOrder.user_id,
+    total: dbOrder.total,
+    status: dbOrder.status as OrderStatus,
+    shipping_cost: dbOrder.shipping_cost,
+    shipping_address: dbOrder.shipping_address,
+    created_at: dbOrder.created_at,
+    payment_received: dbOrder.payment_received || false,
+    payment_intent_id: dbOrder.payment_intent_id
+  };
+};
