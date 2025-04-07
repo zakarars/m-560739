@@ -66,8 +66,8 @@ const Shop = () => {
         <h1 className="text-3xl font-bold mb-8">Shop Our Products</h1>
         
         <CategoryFilter 
-          selectedCategory={selectedCategory}
-          onCategoryChange={setSelectedCategory}
+          onSelectCategory={setSelectedCategory}
+          currentCategory={selectedCategory}
         />
         
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-8">

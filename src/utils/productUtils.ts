@@ -7,6 +7,7 @@ export const apiToInternalProduct = (product: ApiProduct): InternalProduct => {
   return {
     ...product,
     imageUrl: product.imageurl,
+    created_at: product.created_at || new Date().toISOString()
   };
 };
 
