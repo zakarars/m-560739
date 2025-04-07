@@ -17,11 +17,13 @@ import { Order, OrderStatus } from "@/types/orders";
 export interface AdminOrdersTableProps {
   orders: Order[];
   onStatusChange: (orderId: string, newStatus: OrderStatus) => Promise<void>;
+  updatingOrderId?: string; // Added missing prop
 }
 
 export const AdminOrdersTable: React.FC<AdminOrdersTableProps> = ({
   orders,
   onStatusChange,
+  updatingOrderId = "", // Add default value
 }) => {
   return (
     <div className="border rounded-md">
@@ -53,6 +55,7 @@ export const AdminOrdersTable: React.FC<AdminOrdersTableProps> = ({
                   onStatusChange={async (newStatus) => {
                     await onStatusChange(order.id, newStatus);
                   }}
+                  isDisabled={updatingOrderId === order.id} // Use the prop to disable the select when updating
                 />
               </TableCell>
               <TableCell>
