@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,9 +64,7 @@ const Auth = () => {
         options: {
           data: {
             first_name: firstName,
-            last_name: lastName,
-            role: 'user',
-            status: 'active'
+            last_name: lastName
           }
         }
       });

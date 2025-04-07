@@ -5,17 +5,7 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://lilwrisysdrnxqswttxv.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxpbHdyaXN5c2Rybnhxc3d0dHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM1NTIwMDEsImV4cCI6MjA1OTEyODAwMX0.v6tkvSejL8gZ1O_LR1c00DFhzpyx58oL1XGCuxKndY4";
 
-if (!SUPABASE_URL) throw new Error('Missing SUPABASE_URL');
-if (!SUPABASE_PUBLISHABLE_KEY) throw new Error('Missing SUPABASE_PUBLISHABLE_KEY');
-
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-// Create a single supabase client for interacting with your database
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
-  }
-});
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
