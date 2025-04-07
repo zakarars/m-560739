@@ -1,4 +1,3 @@
-
 import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -36,7 +35,7 @@ const AuthError = lazy(() => import("@/pages/AuthError"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 // Stripe publishable key - this is safe to expose in the frontend code
-const stripePromise = loadStripe("pk_test_REPLACE_WITH_YOUR_KEY");
+const stripePromise = loadStripe("pk_test_51RAD8H4cGpdOEtx2uaSCK8U1xCOI6k9LvmciVyRs94Nvabr2vfS3z5skico4g8KPTfmUKqLyVMIHw6fFs1VVdv7f00yA2p0dX4");
 
 // Create a fallback component for when pages are loading
 const PageLoader = () => (
