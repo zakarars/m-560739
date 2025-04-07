@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/context/CartContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { Elements } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
 
 import Index from "./pages/Index";
 import Shop from "./pages/Shop";
@@ -26,6 +29,9 @@ import AdminUserEdit from "@/pages/AdminUserEdit";
 import AdminOrderDetail from "@/pages/AdminOrderDetail";
 import AdminAnalytics from "@/pages/AdminAnalytics";
 
+// Stripe publishable key - this is safe to expose in the frontend code
+const stripePromise = loadStripe("pk_test_REPLACE_WITH_YOUR_KEY");
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -40,31 +46,33 @@ const App = () => (
     <TooltipProvider>
       <AuthProvider>
         <CartProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/shop" element={<Shop />} />
-              <Route path="/product/:id" element={<ProductDetail />} />
-              <Route path="/cart" element={<Cart />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
-              <Route path="/orders" element={<Orders />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/admin/orders" element={<AdminOrders />} />
-              <Route path="/admin/orders/:orderId" element={<AdminOrderDetail />} />
-              <Route path="/admin/products" element={<AdminProducts />} />
-              <Route path="/admin/users" element={<AdminUsers />} />
-              <Route path="/admin/users/:userId" element={<AdminUserDetail />} />
-              <Route path="/admin/users/:userId/edit" element={<AdminUserEdit />} />
-              <Route path="/admin/analytics" element={<AdminAnalytics />} />
-              <Route path="/our-story" element={<OurStory />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/auth/error" element={<AuthError />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
+          <Elements stripe={stripePromise}>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/shop" element={<Shop />} />
+                <Route path="/product/:id" element={<ProductDetail />} />
+                <Route path="/cart" element={<Cart />} />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
+                <Route path="/orders" element={<Orders />} />
+                <Route path="/admin" element={<Admin />} />
+                <Route path="/admin/orders" element={<AdminOrders />} />
+                <Route path="/admin/orders/:orderId" element={<AdminOrderDetail />} />
+                <Route path="/admin/products" element={<AdminProducts />} />
+                <Route path="/admin/users" element={<AdminUsers />} />
+                <Route path="/admin/users/:userId" element={<AdminUserDetail />} />
+                <Route path="/admin/users/:userId/edit" element={<AdminUserEdit />} />
+                <Route path="/admin/analytics" element={<AdminAnalytics />} />
+                <Route path="/our-story" element={<OurStory />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/auth/error" element={<AuthError />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </Elements>
         </CartProvider>
       </AuthProvider>
     </TooltipProvider>

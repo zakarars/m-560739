@@ -1,31 +1,39 @@
 
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { 
-  CheckCircle, 
-  Package, 
-  ShoppingCart,
-  Clock 
-} from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { Order, OrderItem, fromDbOrder, OrderStatus } from "@/types/orders";
-import { statusIcons, statusLabels } from "@/components/orders/OrderStatusIcons";
+import { CheckCircle, XCircle, Loader2, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { Order, OrderItem, fromDbOrder } from "@/types/orders";
+import { useStripe } from "@stripe/react-stripe-js";
 
 const OrderConfirmation = () => {
-  const { orderId } = useParams();
+  const { orderId } = useParams<{ orderId: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const stripe = useStripe();
+  
+  const [loading, setLoading] = useState(true);
   const [order, setOrder] = useState<Order | null>(null);
-  const [items, setItems] = useState<OrderItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [paymentStatus, setPaymentStatus] = useState<"success" | "failed" | "pending">("pending");
+  
   useEffect(() => {
-    async function fetchOrderDetails() {
-      setIsLoading(true);
+    if (!user) {
+      toast.error("Please sign in to view your order");
+      navigate("/auth");
+      return;
+    }
+    
+    const fetchOrderDetails = async () => {
       try {
+        setLoading(true);
+        
+        // Get order details
         const { data: orderData, error: orderError } = await supabase
           .from("orders")
           .select("*")
@@ -33,225 +41,235 @@ const OrderConfirmation = () => {
           .single();
         
         if (orderError) throw orderError;
-
-        const typedOrder = fromDbOrder(orderData);
-        console.log("Fetched order:", typedOrder);
-
-        const { data: itemsData, error: itemsError } = await supabase
+        
+        // Convert the DB order to our type
+        const parsedOrder = fromDbOrder(orderData);
+        setOrder(parsedOrder);
+        
+        // Get order items
+        const { data: items, error: itemsError } = await supabase
           .from("order_items")
           .select(`
             *,
-            products:product_id (
-              id, name, price, imageurl, description, category
-            )
+            product:product_id (*)
           `)
           .eq("order_id", orderId);
         
         if (itemsError) throw itemsError;
-
-        const transformedItems = itemsData.map(item => ({
-          ...item,
-          product: {
-            ...item.products,
-            imageUrl: item.products.imageurl
+        
+        setOrderItems(items);
+        
+        // Check payment status from URL params (Stripe redirects with payment_intent and payment_intent_client_secret)
+        if (window.location.search) {
+          const params = new URLSearchParams(window.location.search);
+          const paymentIntentId = params.get("payment_intent");
+          
+          if (paymentIntentId && stripe) {
+            const { paymentIntent } = await stripe.retrievePaymentIntent(
+              params.get("payment_intent_client_secret") || ""
+            );
+            
+            if (paymentIntent) {
+              switch (paymentIntent.status) {
+                case "succeeded":
+                  setPaymentStatus("success");
+                  break;
+                case "processing":
+                  setPaymentStatus("pending");
+                  // Regularly check the order status
+                  const interval = setInterval(async () => {
+                    const { data } = await supabase
+                      .from("orders")
+                      .select("payment_received")
+                      .eq("id", orderId)
+                      .single();
+                    
+                    if (data?.payment_received) {
+                      setPaymentStatus("success");
+                      clearInterval(interval);
+                    }
+                  }, 5000);
+                  return () => clearInterval(interval);
+                default:
+                  setPaymentStatus("failed");
+                  break;
+              }
+            }
           }
-        }));
-
-        setOrder(typedOrder);
-        setItems(transformedItems);
-      } catch (err) {
-        console.error("Error fetching order:", err);
-        setError('Failed to load order details');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    if (orderId) {
-      fetchOrderDetails();
-    }
-  }, [orderId]);
-
-  // Setup real-time subscription for this specific order
-  useEffect(() => {
-    if (!orderId) return;
-    
-    const channel = supabase
-      .channel(`order-${orderId}`)
-      .on('postgres_changes', 
-        { 
-          event: 'UPDATE', 
-          schema: 'public', 
-          table: 'orders',
-          filter: `id=eq.${orderId}`
-        }, 
-        (payload) => {
-          console.log("Order confirmation real-time update received:", payload);
-          
-          // Update the order state when it changes
-          const updatedOrder = fromDbOrder(payload.new);
-          
-          // Show toast if status changed
-          if (order && order.status !== updatedOrder.status) {
-            toast.info(`Order status updated to ${updatedOrder.status}`);
-          }
-          
-          setOrder(updatedOrder);
+        } else {
+          // If no URL params, check the payment_received flag in the order
+          setPaymentStatus(orderData.payment_received ? "success" : "pending");
         }
-      )
-      .subscribe();
-      
-    return () => {
-      supabase.removeChannel(channel);
+      } catch (error) {
+        console.error("Error fetching order:", error);
+        toast.error("Failed to fetch order details");
+      } finally {
+        setLoading(false);
+      }
     };
-  }, [orderId, order]);
-
-  if (isLoading) {
+    
+    fetchOrderDetails();
+  }, [orderId, user, navigate, stripe]);
+  
+  if (loading) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-16 text-center">
-          <Clock className="w-12 h-12 mx-auto mb-4 animate-spin text-primary" />
-          <h1 className="text-2xl font-bold">Loading order details...</h1>
+          <Loader2 className="w-12 h-12 mx-auto mb-4 text-primary animate-spin" />
+          <h1 className="text-3xl font-bold mb-2">Loading Order Details</h1>
+          <p className="text-muted-foreground">Please wait...</p>
         </div>
       </Layout>
     );
   }
-
-  if (error) {
-    return (
-      <Layout>
-        <div className="container mx-auto px-4 py-16 text-center">
-          <h1 className="text-2xl font-bold text-destructive mb-4">
-            {error || "Order not found"}
-          </h1>
-          <Button asChild>
-            <Link to="/shop">Continue Shopping</Link>
-          </Button>
-        </div>
-      </Layout>
-    );
-  }
-
+  
   if (!order) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-16 text-center">
-          <h1 className="text-2xl font-bold text-destructive mb-4">
-            Order not found
-          </h1>
-          <Button asChild>
-            <Link to="/shop">Continue Shopping</Link>
-          </Button>
+          <XCircle className="w-12 h-12 mx-auto mb-4 text-destructive" />
+          <h1 className="text-3xl font-bold mb-2">Order Not Found</h1>
+          <p className="text-muted-foreground mb-6">
+            We couldn't find the order you're looking for.
+          </p>
+          <Link to="/orders">
+            <Button>View Your Orders</Button>
+          </Link>
         </div>
       </Layout>
     );
   }
-
+  
   return (
     <Layout>
       <div className="container max-w-4xl mx-auto px-4 py-8">
-        <div className="text-center mb-8">
-          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+        <div className="text-center mb-10">
+          {paymentStatus === "success" ? (
+            <>
+              <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
+              <h1 className="text-3xl font-bold mb-2">Order Confirmed!</h1>
+              <p className="text-muted-foreground">
+                Thank you for your purchase. Your order has been received.
+              </p>
+            </>
+          ) : paymentStatus === "failed" ? (
+            <>
+              <XCircle className="w-16 h-16 mx-auto mb-4 text-destructive" />
+              <h1 className="text-3xl font-bold mb-2">Payment Failed</h1>
+              <p className="text-muted-foreground mb-4">
+                Unfortunately, your payment could not be processed.
+              </p>
+              <Button onClick={() => navigate(`/checkout`)}>
+                Try Again
+              </Button>
+            </>
+          ) : (
+            <>
+              <Loader2 className="w-16 h-16 mx-auto mb-4 text-primary animate-spin" />
+              <h1 className="text-3xl font-bold mb-2">Processing Payment</h1>
+              <p className="text-muted-foreground">
+                We're processing your payment. This may take a moment.
+              </p>
+            </>
+          )}
         </div>
         
-        <h1 className="text-3xl font-bold text-center mb-2">Order Confirmed</h1>
-        <p className="text-center text-muted-foreground mb-6">
-          Thank you for your purchase! Your order has been received.
-        </p>
-        
-        <div className="flex items-center justify-center mb-10">
-          <div className="flex items-center gap-2 px-4 py-2 bg-muted rounded-full">
-            {statusIcons[order.status as OrderStatus]}
-            <span className="font-medium">
-              Status: {statusLabels[order.status as OrderStatus]}
-            </span>
+        <div className="bg-background rounded-lg border p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Order Details</h2>
+          
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Order Number</p>
+              <p className="font-medium">{order.id.substring(0, 8)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Date</p>
+              <p className="font-medium">
+                {new Date(order.created_at).toLocaleDateString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Status</p>
+              <p className="font-medium capitalize">{order.status}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Payment</p>
+              <p className="font-medium">
+                {paymentStatus === "success" ? "Paid" : 
+                  paymentStatus === "pending" ? "Processing" : "Failed"}
+              </p>
+            </div>
           </div>
+          
+          <Separator className="my-4" />
+          
+          <h3 className="font-semibold mb-3">Shipping Address</h3>
+          <address className="not-italic text-muted-foreground">
+            {order.shipping_address.fullName}<br />
+            {order.shipping_address.address}<br />
+            {order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.zipCode}<br />
+            {order.shipping_address.country}
+          </address>
         </div>
         
-        <div className="bg-background rounded-lg border p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Order Details</h2>
-            <p className="text-sm text-muted-foreground">
-              Order #: {order.id.substring(0, 8)}
-            </p>
-          </div>
+        <div className="bg-background rounded-lg border p-6">
+          <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
           
-          <Separator className="mb-4" />
-          
-          <div className="space-y-4">
-            {items.map((item) => (
-              <div key={item.id} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-16 w-16 rounded overflow-hidden">
-                    <img 
-                      src={item.product.imageUrl} 
-                      alt={item.product.name}
-                      className="h-full w-full object-cover"
-                    />
+          <div className="space-y-4 mb-6">
+            {orderItems.length > 0 ? (
+              orderItems.map((item) => (
+                <div key={item.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-16 w-16 rounded overflow-hidden">
+                      <img 
+                        src={item.product.imageurl} 
+                        alt={item.product.name}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <p className="font-medium">{item.product.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Qty: {item.quantity} x ${item.price.toFixed(2)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">{item.product.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Qty: {item.quantity} × ${item.price.toFixed(2)}
-                    </p>
-                  </div>
+                  <p className="font-medium">
+                    ${(item.price * item.quantity).toFixed(2)}
+                  </p>
                 </div>
-                <p className="font-medium">
-                  ${(item.price * item.quantity).toFixed(2)}
-                </p>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <ShoppingBag className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                <p>No items found</p>
               </div>
-            ))}
+            )}
           </div>
           
           <Separator className="my-4" />
           
           <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Subtotal</span>
-              <span>${(order.total - (order.shipping_cost || 0)).toFixed(2)}</span>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span>${(order.total - order.shipping_cost).toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span>Shipping</span>
-              <span>
-                {order.shipping_cost > 0 
-                  ? `$${order.shipping_cost.toFixed(2)}` 
-                  : 'Free'}
-              </span>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Shipping</span>
+              <span>${order.shipping_cost.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between font-semibold pt-2">
+            <Separator className="my-2" />
+            <div className="flex justify-between font-semibold">
               <span>Total</span>
               <span>${order.total.toFixed(2)}</span>
             </div>
           </div>
         </div>
         
-        <div className="bg-background rounded-lg border p-6">
-          <h2 className="text-xl font-semibold mb-4">Shipping Information</h2>
-          
-          <div className="space-y-3">
-            <p className="font-medium">{order.shipping_address.fullName}</p>
-            <p>{order.shipping_address.address}</p>
-            <p>
-              {order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.zipCode}
-            </p>
-            <p>{order.shipping_address.country}</p>
-          </div>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
-          <Button asChild variant="outline" size="lg" className="sm:w-auto">
-            <Link to="/orders">
-              <Package className="mr-2 h-4 w-4" />
-              View All Orders
-            </Link>
-          </Button>
-          
-          <Button asChild size="lg" className="sm:w-auto">
-            <Link to="/shop">
-              <ShoppingCart className="mr-2 h-4 w-4" />
-              Continue Shopping
-            </Link>
-          </Button>
+        <div className="mt-8 flex justify-center">
+          <Link to="/shop">
+            <Button>Continue Shopping</Button>
+          </Link>
         </div>
       </div>
     </Layout>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
@@ -11,6 +12,7 @@ import { ArrowLeft, CreditCard, ShoppingBag, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { calculateShippingCost } from "@/types/orders";
+import { StripePaymentWrapper } from "@/components/payment/StripePaymentWrapper";
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -18,6 +20,8 @@ const Checkout = () => {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shippingCost, setShippingCost] = useState(0);
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [orderCreated, setOrderCreated] = useState(false);
   
   // Form state
   const [fullName, setFullName] = useState("");
@@ -90,7 +94,8 @@ const Checkout = () => {
           total,
           shipping_cost: shipping,
           shipping_address: shippingAddress,
-          status: "pending"
+          status: "pending",
+          payment_received: false
         })
         .select()
         .single();
@@ -117,17 +122,15 @@ const Checkout = () => {
         throw new Error(`Failed to create order items: ${itemsError.message}`);
       }
       
-      // Clear the cart and navigate to confirmation
-      clearCart();
-      navigate(`/order-confirmation/${order.id}`);
-      toast.success("Order placed successfully!");
+      // Set the order ID for the payment process
+      setOrderId(order.id);
+      setOrderCreated(true);
       
     } catch (error) {
       console.error("Error creating order:", error);
       toast.error("Failed to place order", {
         description: "Please try again later"
       });
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -152,108 +155,120 @@ const Checkout = () => {
   return (
     <Layout>
       <div className="container max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Checkout</h1>
+        <h1 className="text-3xl font-bold mb-8">{orderCreated ? 'Payment' : 'Checkout'}</h1>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
-            <div className="bg-background rounded-lg border p-6">
-              <h2 className="text-xl font-semibold mb-6">Shipping Information</h2>
-              
-              <form onSubmit={handleSubmitOrder} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name</Label>
-                  <Input 
-                    id="fullName"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
+            {!orderCreated ? (
+              <div className="bg-background rounded-lg border p-6">
+                <h2 className="text-xl font-semibold mb-6">Shipping Information</h2>
+                
+                <form onSubmit={handleSubmitOrder} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">Full Name</Label>
+                    <Input 
+                      id="fullName"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Street Address</Label>
+                    <Input 
+                      id="address"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input 
+                        id="city"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="state">State</Label>
+                      <Input 
+                        id="state"
+                        value={state}
+                        onChange={(e) => setState(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="zipCode">Zip Code</Label>
+                      <Input 
+                        id="zipCode"
+                        value={zipCode}
+                        onChange={(e) => setZipCode(e.target.value)}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="country">Country</Label>
+                      <Input 
+                        id="country"
+                        value={country}
+                        onChange={(e) => setCountry(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate("/cart")}
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back to Cart
+                    </Button>
+                    
+                    <Button 
+                      type="submit" 
+                      disabled={isSubmitting}
+                      className="min-w-[150px]"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="mr-2 h-4 w-4" />
+                          Continue to Payment
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            ) : (
+              <div>
+                <h2 className="text-xl font-semibold mb-6">Payment Information</h2>
+                {orderId && (
+                  <StripePaymentWrapper 
+                    orderId={orderId} 
+                    orderTotal={getCartTotal() + shippingCost} 
                   />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="address">Street Address</Label>
-                  <Input 
-                    id="address"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    required
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="city">City</Label>
-                    <Input 
-                      id="city"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="state">State</Label>
-                    <Input 
-                      id="state"
-                      value={state}
-                      onChange={(e) => setState(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="zipCode">Zip Code</Label>
-                    <Input 
-                      id="zipCode"
-                      value={zipCode}
-                      onChange={(e) => setZipCode(e.target.value)}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="country">Country</Label>
-                    <Input 
-                      id="country"
-                      value={country}
-                      onChange={(e) => setCountry(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => navigate("/cart")}
-                  >
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Cart
-                  </Button>
-                  
-                  <Button 
-                    type="submit" 
-                    disabled={isSubmitting}
-                    className="min-w-[150px]"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="mr-2 h-4 w-4" />
-                        Place Order
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </div>
+                )}
+              </div>
+            )}
           </div>
           
           <div className="lg:col-span-1">
