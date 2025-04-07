@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
@@ -36,35 +37,52 @@ const AdminUsers = () => {
 
   // Function to fetch users
   const fetchUsers = async () => {
-    let query = supabase
-      .from("profiles")
-      .select("*, user:id(email)")
-      .order("created_at", { ascending: false });
+    try {
+      // First get profiles
+      let query = supabase
+        .from("profiles")
+        .select("id, first_name, last_name, created_at")
+        .order("created_at", { ascending: false });
 
-    // Apply search if present
-    if (searchQuery) {
-      query = query.or(`user.email.ilike.%${searchQuery}%,first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%`);
+      // Apply search if present
+      if (searchQuery) {
+        query = query.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%`);
+      }
+
+      const { data: profiles, error: profilesError } = await query;
+
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+        throw new Error(profilesError.message);
+      }
+
+      // Get user emails separately since we can't directly join with auth.users
+      const usersWithEmails: User[] = [];
+      
+      // For each profile, get the email if possible
+      for (const profile of profiles) {
+        // In a real app, you would have a more efficient way to get user emails
+        // This is a workaround since we can't directly join with auth.users
+        const { data: userData, error: userError } = await supabase.auth.admin.getUserById(profile.id);
+        
+        const email = userError ? 'Email not available' : userData?.user?.email || 'No email provided';
+        
+        usersWithEmails.push({
+          id: profile.id,
+          email: email,
+          created_at: profile.created_at,
+          full_name: profile.first_name && profile.last_name 
+            ? `${profile.first_name} ${profile.last_name}` 
+            : profile.first_name || profile.last_name || null,
+          role: 'User' // Default role
+        });
+      }
+
+      return usersWithEmails;
+    } catch (error) {
+      console.error("Error in fetchUsers:", error);
+      throw error;
     }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error("Error fetching users:", error);
-      throw new Error(error.message);
-    }
-
-    // Transform the data to match our User interface
-    const users: User[] = data.map(profile => ({
-      id: profile.id,
-      email: profile.user?.email || 'No email provided',
-      created_at: profile.created_at,
-      full_name: profile.first_name && profile.last_name 
-        ? `${profile.first_name} ${profile.last_name}` 
-        : profile.first_name || profile.last_name || null,
-      role: 'User' // Default role
-    }));
-
-    return users;
   };
 
   const {
