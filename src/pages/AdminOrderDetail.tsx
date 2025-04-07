@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
@@ -28,7 +27,6 @@ const AdminOrderDetail = () => {
       try {
         setIsLoading(true);
         
-        // Get order details
         const { data: orderData, error: orderError } = await supabase
           .from("orders")
           .select("*")
@@ -37,11 +35,9 @@ const AdminOrderDetail = () => {
         
         if (orderError) throw orderError;
         
-        // Convert the DB order to our type
         const parsedOrder = fromDbOrder(orderData);
         setOrder(parsedOrder);
         
-        // Get order items
         const { data: items, error: itemsError } = await supabase
           .from("order_items")
           .select(`
@@ -54,7 +50,6 @@ const AdminOrderDetail = () => {
         
         setOrderItems(items);
         
-        // Get customer info
         const { data: customer, error: customerError } = await supabase
           .from("profiles")
           .select("first_name, last_name")
@@ -63,7 +58,6 @@ const AdminOrderDetail = () => {
         
         if (customerError) throw customerError;
         
-        // Get email from auth
         const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(orderData.user_id);
         
         if (authError) throw authError;
@@ -90,7 +84,6 @@ const AdminOrderDetail = () => {
     try {
       setIsUpdating(true);
       
-      // Update the order status
       const { error } = await supabase
         .from("orders")
         .update({
@@ -101,7 +94,6 @@ const AdminOrderDetail = () => {
       
       if (error) throw error;
       
-      // Update local state
       setOrder(prev => prev ? { ...prev, status: newStatus } : null);
       
       toast.success(`Order status updated to ${newStatus}`);
@@ -295,10 +287,10 @@ const AdminOrderDetail = () => {
                   </p>
                 </div>
                 
-                {order.stripe_payment_intent_id && (
+                {order.payment_intent_id && (
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Payment ID</p>
-                    <p className="text-sm font-mono">{order.stripe_payment_intent_id}</p>
+                    <p className="text-sm font-mono">{order.payment_intent_id}</p>
                   </div>
                 )}
               </div>

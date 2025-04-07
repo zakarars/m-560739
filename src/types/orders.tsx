@@ -13,6 +13,21 @@ export interface ShippingAddress {
   country: string;
 }
 
+export interface OrderItem {
+  id: string;
+  order_id: string;
+  product_id: string;
+  product: {
+    id: string;
+    name: string;
+    imageurl: string;
+    price: number;
+    description?: string;
+  };
+  quantity: number;
+  price: number;
+}
+
 export interface Order {
   id: string;
   user_id: string;

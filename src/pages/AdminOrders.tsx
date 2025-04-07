@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import AdminLayout from "@/components/AdminLayout";
 import { AdminOrdersTable } from "@/components/orders/AdminOrdersTable";
@@ -9,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
-import { OrderStatus } from "@/types/orders";
+import { OrderStatus, fromDbOrder, Order } from "@/types/orders";
 
 // Helper function to get human-readable status name
 const getStatusName = (status: OrderStatus) => {
@@ -63,7 +62,8 @@ const AdminOrders = () => {
       throw new Error(error.message);
     }
 
-    return data || [];
+    // Convert the DB orders to our application Order type
+    return (data || []).map(order => fromDbOrder(order));
   };
 
   const {

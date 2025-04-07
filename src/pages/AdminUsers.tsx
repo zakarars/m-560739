@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
@@ -38,13 +37,13 @@ const AdminUsers = () => {
   // Function to fetch users
   const fetchUsers = async () => {
     let query = supabase
-      .from("users")
-      .select("*")
+      .from("profiles")
+      .select("*, user:id(email)")
       .order("created_at", { ascending: false });
 
     // Apply search if present
     if (searchQuery) {
-      query = query.or(`email.ilike.%${searchQuery}%,full_name.ilike.%${searchQuery}%`);
+      query = query.or(`user.email.ilike.%${searchQuery}%,first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%`);
     }
 
     const { data, error } = await query;
@@ -54,7 +53,18 @@ const AdminUsers = () => {
       throw new Error(error.message);
     }
 
-    return data as User[];
+    // Transform the data to match our User interface
+    const users: User[] = data.map(profile => ({
+      id: profile.id,
+      email: profile.user?.email || 'No email provided',
+      created_at: profile.created_at,
+      full_name: profile.first_name && profile.last_name 
+        ? `${profile.first_name} ${profile.last_name}` 
+        : profile.first_name || profile.last_name || null,
+      role: 'User' // Default role
+    }));
+
+    return users;
   };
 
   const {

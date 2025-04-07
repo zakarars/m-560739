@@ -5,9 +5,13 @@ import { Product as ApiProduct } from "@/types/products";
 // Convert API product to internal product format
 export const apiToInternalProduct = (product: ApiProduct): InternalProduct => {
   return {
-    ...product,
+    id: product.id,
+    name: product.name,
+    description: product.description,
+    price: product.price,
     imageUrl: product.imageurl,
-    created_at: product.created_at || new Date().toISOString()
+    category: product.category,
+    featured: product.featured
   };
 };
 
@@ -17,5 +21,7 @@ export const internalToApiProduct = (product: InternalProduct): ApiProduct => {
   return {
     ...rest,
     imageurl: imageUrl,
+    created_at: new Date().toISOString(), // Required field in ApiProduct, default to current timestamp
+    updated_at: new Date().toISOString()
   };
 };
